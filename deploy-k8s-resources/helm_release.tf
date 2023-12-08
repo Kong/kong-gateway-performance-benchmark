@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 locals {
-  values_file = (var.kong_enterprise ? "kong-ee-values.yaml" : "kong-ce-values.yaml")
+  kong_values = (var.kong_enterprise ? "kong-ee-values.yaml" : "kong-ce-values.yaml")
 }
 
 provider "helm" {
@@ -24,13 +24,15 @@ resource "helm_release" "kong" {
   namespace  = "kong"
 
   values = [
-    file("${path.module}/${local.values_file}")
+    file("${path.module}/${local.kong_values}")
   ]
 
   set {
     name = "image.tag"
     value = var.kong_version
   }
+
+
 
   depends_on = [ kubernetes_namespace.kong ]
 }
@@ -47,4 +49,46 @@ resource "helm_release" "k6" {
     name = "namespace.create"
     value = false
   }
+
+  set {
+    name = "customLabels.app"
+    value = "k6"
+  }
+}
+
+resource "helm_release" "prometheus" {
+  name       = "prometheus"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "prometheus"
+  namespace  = "observability"
+  depends_on = [ kubernetes_namespace.observability ]
+  version    = "25.8.1"
+
+  values = [
+    file("${path.module}/prometheus-values.yaml")
+  ]
+}
+
+resource "helm_release" "grafana" {
+  name       = "grafana"
+  repository = "https://grafana.github.io/helm-charts"
+  chart      = "grafana"
+  namespace  = "observability"
+  depends_on = [ kubernetes_namespace.observability ]
+  version    = "7.0.11"
+
+  values = [
+    file("${path.module}/grafana-values.yaml")
+  ]
+
+  # set {
+  #   name = "grafana\\.ini.server.domain"
+  #   value = trimprefix(data.kubernetes_service.kong.status.0.load_balancer.0.ingress.0.hostname, "http://" )
+  # }
+
+  # set {
+  #   name = "ingress.hosts.0"
+  #   value = trimprefix(data.kubernetes_service.kong.status.0.load_balancer.0.ingress.0.hostname, "http://" )
+  # }
+
 }
