@@ -49,6 +49,12 @@ resource "kubernetes_namespace" "upstream" {
   }
 }
 
+resource "kubernetes_namespace" "observability" {
+  metadata {
+    name = "observability"
+  }
+}
+
 
 resource "kubernetes_secret" "kong_license" {
   count = (var.kong_enterprise ? 1 : 0)
@@ -162,3 +168,20 @@ resource "kubernetes_ingress_v1" "upstream" {
   }
   depends_on = [ kubernetes_namespace.upstream ]
 }
+
+data "kubernetes_service" "kong" {
+  depends_on = [helm_release.kong]
+  metadata {
+    name = "kong-kong-proxy"
+    namespace = "kong"
+  }
+}
+
+# data "kubernetes_secret_v1" "grafana_password" {
+#   metadata {
+#     name = "grafana"
+#     namespace = "observability"
+#   }
+
+#   depends_on = [ helm_release.grafana ]
+# }

@@ -41,3 +41,17 @@ env:
 
 ingressController:
   enabled: true
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - upstream
+            - k6
+        topologyKey: topology.kubernetes.io/zone

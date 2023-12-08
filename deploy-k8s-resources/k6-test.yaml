@@ -1,5 +1,5 @@
 apiVersion: k6.io/v1alpha1
-kind: K6
+kind: TestRun
 metadata:
   name: k6-kong
 spec:
@@ -8,3 +8,23 @@ spec:
     configMap:
       name: kong-load-test
       file: test.js
+  runner:
+    env:
+      - name: K6_PROMETHEUS_RW_TREND_STATS
+        value: 'avg,p(90),p(99),min,max,med'
+      - name: K6_PROMETHEUS_RW_SERVER_URL
+        value: 'http://prometheus-server.observability.svc.cluster.local/api/v1/write'
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - kong-kong
+                - upstream
+            topologyKey: topology.kubernetes.io/zone
+  arguments:  -o experimental-prometheus-rw

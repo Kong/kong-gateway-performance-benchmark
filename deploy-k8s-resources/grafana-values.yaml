@@ -1,0 +1,14 @@
+grafana.ini:
+  server:
+    domain: localhost
+    root_url: "%(protocol)s://%(domain)s:%(http_port)s"
+    # serve_from_sub_path: true
+# ingress:
+#   enabled: true
+#   hosts: 
+#     - "localhost"
+#   path: "/grafana"
+#   ingressClassName: kong
+sidecar:
+  dashboards:
+    enabled: true
