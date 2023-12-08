@@ -12,3 +12,30 @@ grafana.ini:
 sidecar:
   dashboards:
     enabled: true
+datasources:
+ datasources.yaml:
+   apiVersion: 1
+   datasources:
+   - name: Prometheus
+     type: prometheus
+     url: http://prometheus-server.observability.svc.cluster.local
+     access: proxy
+     isDefault: true
+dashboards:
+  default:
+    k6-prometheus:
+      gnetId: 19665
+      revision: 2
+      datasource: Prometheus
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /var/lib/grafana/dashboards/default
