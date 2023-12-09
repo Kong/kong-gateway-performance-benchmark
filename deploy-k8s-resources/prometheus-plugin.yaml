@@ -1,0 +1,13 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+ name: prometheus-global
+ annotations:
+   kubernetes.io/ingress.class: kong
+ labels:
+   global: "true"
+config:
+ status_code_metrics: true
+ latency_metrics: true
+ bandwidth_metrics: true
+plugin: prometheus
