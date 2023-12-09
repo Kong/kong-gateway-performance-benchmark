@@ -8,6 +8,11 @@ env:
   prefix: /kong_prefix/
   database: "off"
 
+proxy:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8100"
+
 manager:
   enabled: false
 

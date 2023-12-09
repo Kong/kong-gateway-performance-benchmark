@@ -11,6 +11,11 @@ image:
   repository: kong/kong-gateway
   # tag: "3.5"
 
+proxy:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8100"
+
 admin:
   enabled: false
 
