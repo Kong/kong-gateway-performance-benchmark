@@ -1,0 +1,20 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: rate-limit-1
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+config:
+  window_type: fixed
+  limit:
+  - 1000000000000
+  window_size:
+  - 7200
+  identifier: consumer
+  sync_rate: -1
+  namespace: rate-limit-1
+  strategy: local
+  hide_client_headers: false
+plugin: rate-limiting-advanced

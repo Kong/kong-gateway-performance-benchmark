@@ -1,0 +1,12 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: key-auth-global
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+plugin: key-auth
+config:
+  key_names:
+  - apikey
