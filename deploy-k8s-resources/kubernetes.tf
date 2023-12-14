@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 provider "aws" {
   region = var.region
 }
@@ -55,7 +52,6 @@ resource "kubernetes_namespace" "observability" {
   }
 }
 
-
 resource "kubernetes_secret" "kong_license" {
   count = (var.kong_enterprise ? 1 : 0)
   metadata {
@@ -77,7 +73,8 @@ resource "kubernetes_config_map" "kong_load_test" {
   }
   
   data = {
-    "test.js" = "${file("${path.module}/test.js")}"
+    "test.js" = "${file("${path.module}/k6_tests/test.js")}"
+    "k6_tests_01.js" = "${file("${path.module}/k6_tests/k6_tests_01.js")}"
   }
 
   depends_on = [ kubernetes_namespace.k6 ]

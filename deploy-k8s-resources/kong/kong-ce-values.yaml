@@ -14,7 +14,10 @@ proxy:
     prometheus.io/port: "8100"
 
 manager:
-  enabled: false
+  enabled: true
+
+admin:
+  enabled: true
 
 ingressController:
   enabled: true
