@@ -14,20 +14,20 @@ data "aws_availability_zones" "available" {
   }
 }
 
-# locals {
-#   cluster_name = "kong-perf-${random_string.suffix.result}"
-# }
+locals {
+  cluster_name = "${var.cluster_name}-${random_string.suffix.result}"
+}
 
-# resource "random_string" "suffix" {
-#   length  = 8
-#   special = false
-# }
+resource "random_string" "suffix" {
+  length  = 8
+  special = false
+}
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.0.0"
 
-  name = var.vpc_name
+  name = local.cluster_name
 
   cidr = "10.0.0.0/16"
   azs  = slice(data.aws_availability_zones.available.names, 0, 3)
@@ -40,12 +40,12 @@ module "vpc" {
   enable_dns_hostnames = true
 
   public_subnet_tags = {
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
     "kubernetes.io/role/elb"                      = 1
   }
 
   private_subnet_tags = {
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
     "kubernetes.io/role/internal-elb"             = 1
   }
 }
@@ -54,7 +54,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "19.15.3"
 
-  cluster_name    = var.cluster_name
+  cluster_name    = local.cluster_name
   cluster_version = "1.27"
 
   vpc_id                         = module.vpc.vpc_id
