@@ -27,7 +27,14 @@ export default function () {
         url = `http://kong-kong-proxy.kong.svc.cluster.local/upstream/json/valid`;
     }
 
-    const res = http.get(url, { timeout: '180s' });
+    let res;
+    if (__ENV.BASIC_AUTH_ENABLED == 'true'){
+        res = http.get(url, { timeout: '180s', headers: {'Authorization': 'Basic ' + 'dGVzdHVzZXI6dGVzdHVzZXJwYXNzd29yZDE=' } });
+    } else if (__ENV.KEY_AUTH_ENABLED == 'true') {
+        res = http.get(url, { timeout: '180s', headers: {'apikey': 'testuserpassword1' } });
+    } else {
+        res = http.get(url, { timeout: '180s' });
+    }
 
     check(res, {
         'status is 200 for proxy request': (r) => r.status === 200,

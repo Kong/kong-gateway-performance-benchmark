@@ -22,6 +22,10 @@ spec:
         value: '50'
       - name: k6_DURATION
         value: '60s'
+      - name: BASIC_AUTH_ENABLED
+        value: 'false'
+      - name: KEY_AUTH_ENABLED
+        value: 'false'
     affinity:
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:

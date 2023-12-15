@@ -29,8 +29,6 @@ resource "helm_release" "kong" {
     value = var.kong_version
   }
 
-
-
   depends_on = [ kubernetes_namespace.kong ]
 }
 

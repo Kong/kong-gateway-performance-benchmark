@@ -13,12 +13,6 @@ variable "cluster_name" {
   default = "kong-perf-tony"
 }
 
-variable "vpc_name" {
-  description = "EKS cluster name"
-  type = string
-  default = "kong-perf-tony"
-}
-
 variable "instance_type" {
   description = "EKS node instance type"
   type = string
