@@ -2,8 +2,25 @@
 
 set -e
 
+# Function to display usage instructions
+usage() {
+    echo "Usage: ./run_k6_tests.sh <SCRIPT_NAME> [ENTITY_CONFIG_SIZE] [K6_VUS] [k6_DURATION] [BASIC_AUTH_ENABLED] [KEY_AUTH_ENABLED]"
+    echo "Optional arguments:"
+    echo "  [ENTITY_CONFIG_SIZE]: Number of entity config size (default: 1)"
+    echo "  [K6_VUS]: Number of K6 virtual users (default: 50)"
+    echo "  [k6_DURATION]: Duration of the test (default: '120s')"
+    echo "  [BASIC_AUTH_ENABLED]: Enable basic authentication (default: false)"
+    echo "  [KEY_AUTH_ENABLED]: Enable key authentication (default: false)"
+    exit 1
+}
+
+# Check for help argument
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    usage
+fi
+
 if [ $# -lt 1 ]; then
-    echo "Usage: ./run_k6_tests.sh <SCRIPT_NAME> [ENTITY_CONFIG_SIZE] [K6_VUS] [k6_DURATION]"
+    echo "Usage: ./run_k6_tests.sh <SCRIPT_NAME> [ENTITY_CONFIG_SIZE] [K6_VUS] [k6_DURATION] [BASIC_AUTH_ENABLED] [KEY_AUTH_ENABLED]"
     exit 1
 fi
 

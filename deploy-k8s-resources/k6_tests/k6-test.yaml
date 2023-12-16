@@ -14,6 +14,8 @@ spec:
         value: 'avg,p(90),p(99),min,max,med'
       - name: K6_PROMETHEUS_RW_SERVER_URL
         value: 'http://prometheus-server.observability.svc.cluster.local/api/v1/write'
+      - name: K6_INSECURE_SKIP_TLS_VERIFY
+        value: 'true'
       - name: K6_OUT
         value: experimental-prometheus-rw
       - name: ENTITY_CONFIG_SIZE

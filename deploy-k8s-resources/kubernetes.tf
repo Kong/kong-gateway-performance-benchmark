@@ -60,7 +60,7 @@ resource "kubernetes_secret" "kong_license" {
   }
   
   data = {
-    "license" = "${file("${path.module}/kong/license.json")}"
+    "license" = "${file("${path.module}/kong_helm/license.json")}"
   }
 
   depends_on = [ kubernetes_namespace.kong ]

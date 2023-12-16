@@ -4,7 +4,7 @@
 num_routes=100
 
 # Output file name
-output_file="expanded_ingresses.yaml"
+output_file="expanded-ingresses.yaml"
 
 # Remove existing output file if it exists
 [ -e "$output_file" ] && rm "$output_file"
