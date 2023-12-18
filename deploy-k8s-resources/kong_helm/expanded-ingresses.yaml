@@ -1,0 +1,1999 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-1
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /1route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-2
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /2route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-3
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /3route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-4
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /4route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-5
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /5route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-6
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /6route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-7
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /7route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-8
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /8route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-9
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /9route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-10
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /10route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-11
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /11route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-12
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /12route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-13
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /13route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-14
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /14route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-15
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /15route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-16
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /16route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-17
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /17route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-18
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /18route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-19
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /19route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-20
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /20route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-21
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /21route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-22
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /22route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-23
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /23route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-24
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /24route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-25
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /25route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-26
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /26route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-27
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /27route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-28
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /28route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-29
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /29route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-30
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /30route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-31
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /31route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-32
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /32route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-33
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /33route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-34
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /34route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-35
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /35route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-36
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /36route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-37
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /37route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-38
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /38route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-39
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /39route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-40
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /40route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-41
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /41route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-42
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /42route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-43
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /43route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-44
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /44route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-45
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /45route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-46
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /46route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-47
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /47route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-48
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /48route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-49
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /49route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-50
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /50route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-51
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /51route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-52
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /52route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-53
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /53route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-54
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /54route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-55
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /55route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-56
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /56route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-57
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /57route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-58
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /58route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-59
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /59route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-60
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /60route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-61
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /61route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-62
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /62route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-63
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /63route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-64
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /64route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-65
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /65route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-66
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /66route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-67
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /67route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-68
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /68route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-69
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /69route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-70
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /70route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-71
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /71route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-72
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /72route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-73
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /73route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-74
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /74route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-75
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /75route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-76
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /76route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-77
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /77route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-78
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /78route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-79
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /79route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-80
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /80route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-81
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /81route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-82
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /82route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-83
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /83route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-84
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /84route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-85
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /85route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-86
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /86route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-87
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /87route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-88
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /88route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-89
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /89route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-90
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /90route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-91
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /91route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-92
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /92route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-93
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /93route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-94
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /94route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-95
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /95route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-96
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /96route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-97
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /97route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-98
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /98route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-99
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /99route
+        pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    konghq.com/strip-path: "true"
+  name: upstream-100
+  namespace: upstream
+spec:
+  ingressClassName: kong
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: upstream
+            port:
+              number: 8000
+        path: /100route
+        pathType: ImplementationSpecific

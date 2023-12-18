@@ -1,0 +1,12 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: rate-limit-1
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+config:
+  day: 1000000000000
+  policy: local
+plugin: rate-limiting

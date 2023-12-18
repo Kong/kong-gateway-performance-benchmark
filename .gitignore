@@ -27,4 +27,7 @@ override.tf.json
 terraform.rc
 
 **/.DS_Store
-**/license.json
+*.plan
+*.lock.hcl
+
+**/k6-test-temp.yaml

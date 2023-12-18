@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 locals {
   kong_values = (var.kong_enterprise ? "kong-ee-values.yaml" : "kong-ce-values.yaml")
 }
@@ -24,15 +21,13 @@ resource "helm_release" "kong" {
   namespace  = "kong"
 
   values = [
-    file("${path.module}/${local.kong_values}")
+    file("${path.module}/kong_helm/${local.kong_values}")
   ]
 
   set {
     name = "image.tag"
     value = var.kong_version
   }
-
-
 
   depends_on = [ kubernetes_namespace.kong ]
 }
@@ -65,7 +60,7 @@ resource "helm_release" "prometheus" {
   version    = "25.8.1"
 
   values = [
-    file("${path.module}/prometheus-values.yaml")
+    file("${path.module}/prometheus_helm/prometheus-values.yaml")
   ]
 }
 
@@ -78,7 +73,7 @@ resource "helm_release" "grafana" {
   version    = "7.0.11"
 
   values = [
-    file("${path.module}/grafana-values.yaml")
+    file("${path.module}/grafana_helm/grafana-values.yaml")
   ]
 
   # set {
