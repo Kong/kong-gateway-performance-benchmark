@@ -30,7 +30,7 @@ index=${1:-100}
 
 # Generate YAML content for each key up to the specified index
 for ((i=1; i<=$index; i++)); do
-    generate_key_yaml $i >> "key-auth-testuser-secret-${i}.yaml"
-done
+    generate_key_yaml $i
+done > "key-auth-testuser-secret-${index}.yaml"
 
-echo "YAML files generated successfully."
+echo "YAML file 'key-auth-testuser-secret-${index}.yaml' generated successfully."

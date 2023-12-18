@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
+import encoding from 'k6/encoding';
 
 const config_size = __ENV.ENTITY_CONFIG_SIZE || 1;
 
@@ -10,6 +11,8 @@ export const options = {
 };
 export default function () {
     let url;
+    let basic_auth_header;
+    let key_auth_header;
     if (__ENV.ENTITY_CONFIG_SIZE > 1){
         let random = Math.floor(
             Math.sqrt(
@@ -22,16 +25,20 @@ export default function () {
               Math.floor(config_size / 2)
           );
         
-        url = `http://kong-kong-proxy.kong.svc.cluster.local/${random}route/json/valid`;    
+        url = `https://kong-kong-proxy.kong.svc.cluster.local/${random}route/json/valid`; 
+        basic_auth_header = 'Basic ' + encoding.b64encode(`testuser${random}:testuserpassword${random}`);
+        key_auth_header = `testuserpassword${random}`;   
     } else {
-        url = `http://kong-kong-proxy.kong.svc.cluster.local/upstream/json/valid`;
+        url = `https://kong-kong-proxy.kong.svc.cluster.local/upstream/json/valid`;
+        basic_auth_header = 'Basic ' + encoding.b64encode(`testuser1:testuserpassword1`);
+        key_auth_header = `testuserpassword1`;
     }
 
     let res;
     if (__ENV.BASIC_AUTH_ENABLED == 'true'){
-        res = http.get(url, { timeout: '180s', headers: {'Authorization': 'Basic ' + 'dGVzdHVzZXI6dGVzdHVzZXJwYXNzd29yZDE=' } });
+        res = http.get(url, { timeout: '180s', headers: {'Authorization': basic_auth_header} });
     } else if (__ENV.KEY_AUTH_ENABLED == 'true') {
-        res = http.get(url, { timeout: '180s', headers: {'apikey': 'testuserpassword1' } });
+        res = http.get(url, { timeout: '180s', headers: {'apikey': key_auth_header} });
     } else {
         res = http.get(url, { timeout: '180s' });
     }

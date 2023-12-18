@@ -10,7 +10,7 @@ variable "region" {
 variable "cluster_name" {
   description = "EKS cluster name"
   type = string
-  default = "kong-perf-tony"
+  default = "kong-perf"
 }
 
 variable "instance_type" {

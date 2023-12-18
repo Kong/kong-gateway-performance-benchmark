@@ -1,6 +1,9 @@
 #!/bin/bash
 
-output_file="kong-consumers.yaml"
+# Check if the number of consumers is provided as an argument, otherwise default to 100
+num_consumers=${1:-100}
+
+output_file="kong-consumers-$num_consumers.yaml"
 
 # Remove existing output file if it exists
 [ -e "$output_file" ] && rm "$output_file"
@@ -18,14 +21,11 @@ metadata:
 username: testuser$index
 custom_id: testuser$index
 credentials:
-- test-user-basic-auth
-- test-user-key-auth
+- test-user-basic-auth-$index
+- test-user-key-auth-$index
 ---
 EOF
 }
-
-# Check if the number of consumers is provided as an argument, otherwise default to 100
-num_consumers=${1:-100}
 
 # Generate YAML for KongConsumers based on the specified number
 for ((i=1; i<=$num_consumers; i++)); do
