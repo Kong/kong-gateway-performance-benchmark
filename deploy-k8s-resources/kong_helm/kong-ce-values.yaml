@@ -2,11 +2,12 @@
 
 image:
   repository: kong
-  # tag: "3.5"
 
 env:
   prefix: /kong_prefix/
   database: "off"
+  # TODO: set this based on node cores
+  nginx_worker_processes: 16
 
 proxy:
   annotations:
@@ -14,24 +15,15 @@ proxy:
     prometheus.io/port: "8100"
 
 manager:
-  enabled: true
+  enabled: false
 
 admin:
-  enabled: true
+  enabled: false
 
 ingressController:
   enabled: true
 
-affinity:
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-    - weight: 100
-      podAffinityTerm:
-        labelSelector:
-          matchExpressions:
-          - key: app
-            operator: In
-            values:
-            - upstream
-            - k6
-        topologyKey: topology.kubernetes.io/zone
+tolerations:
+  - key: "dedicated"
+    value: "kong"
+    effect: "NoSchedule"

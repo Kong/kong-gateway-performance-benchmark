@@ -75,15 +75,17 @@ resource "helm_release" "grafana" {
   values = [
     file("${path.module}/grafana_helm/grafana-values.yaml")
   ]
+}
 
-  # set {
-  #   name = "grafana\\.ini.server.domain"
-  #   value = trimprefix(data.kubernetes_service.kong.status.0.load_balancer.0.ingress.0.hostname, "http://" )
-  # }
+resource "helm_release" "redis" {
+  name = "redis"
+  chart = "bitnamicharts/redis"
+  repository = "oci://registry-1.docker.io"
+  namespace = "kong"
+  depends_on = [ kubernetes_namespace.kong ]
+  version = "18.5.0"
 
-  # set {
-  #   name = "ingress.hosts.0"
-  #   value = trimprefix(data.kubernetes_service.kong.status.0.load_balancer.0.ingress.0.hostname, "http://" )
-  # }
-
+  values = [
+    file("${path.module}/redis-values.yaml")
+  ]
 }

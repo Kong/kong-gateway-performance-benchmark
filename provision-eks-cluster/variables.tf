@@ -16,5 +16,5 @@ variable "cluster_name" {
 variable "instance_type" {
   description = "EKS node instance type"
   type = string
-  default = "c5.large"
+  default = "c5.4xlarge"
 }
