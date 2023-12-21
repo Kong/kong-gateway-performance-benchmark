@@ -9,7 +9,6 @@
 
 image:
   repository: kong/kong-gateway
-  # tag: "3.5"
 
 proxy:
   annotations:
@@ -43,20 +42,13 @@ portalapi:
 env:
   prefix: /kong_prefix/
   database: "off"
+  # TODO: set this based on node cores
+  nginx_worker_processes: 16
 
 ingressController:
   enabled: true
 
-affinity:
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-    - weight: 100
-      podAffinityTerm:
-        labelSelector:
-          matchExpressions:
-          - key: app
-            operator: In
-            values:
-            - upstream
-            - k6
-        topologyKey: topology.kubernetes.io/zone
+tolerations:
+  - key: "dedicated"
+    value: "kong"
+    effect: "NoSchedule"

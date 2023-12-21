@@ -1,0 +1,10 @@
+auth:
+  password: redispassword1
+
+architecture: standalone
+
+master:
+  tolerations:
+    - key: "dedicated"
+      value: "kong"
+      effect: "NoSchedule"
