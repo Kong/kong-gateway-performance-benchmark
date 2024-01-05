@@ -30,8 +30,8 @@ spec:
         cpu: 12000m
         memory: 26Gi
       requests:
-        cpu: 12000m
-        memory: 26Gi
+        cpu: 10000m
+        memory: 13Gi
     env:
       - name: K6_PROMETHEUS_RW_TREND_STATS
         value: 'avg,p(90),p(95),p(99),min,max,med,med,count,sum'

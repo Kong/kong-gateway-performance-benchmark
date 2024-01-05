@@ -35,6 +35,10 @@ dashboards:
       gnetId: 7424
       revision: 11
       datasource: Prometheus
+    pod-monitor:
+      gnetId: 15055
+      revision: 7
+      datasource: Prometheus
 dashboardProviders:
   dashboardproviders.yaml:
     apiVersion: 1
