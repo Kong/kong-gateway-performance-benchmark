@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Number of routes
-num_routes=100
+num_routes=${1:-100}
 
 # Output file name
-output_file="expanded-ingresses.yaml"
+output_file="expanded-ingresses-$num_routes.yaml"
 
 # Remove existing output file if it exists
 [ -e "$output_file" ] && rm "$output_file"
