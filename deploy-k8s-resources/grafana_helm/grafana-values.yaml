@@ -27,6 +27,10 @@ dashboards:
       gnetId: 19665
       revision: 2
       datasource: Prometheus
+    k6-prometheus-native-histogram:
+      gnetId: 18030
+      revision: 8
+      datasource: Prometheus
     kong:
       gnetId: 7424
       revision: 11
