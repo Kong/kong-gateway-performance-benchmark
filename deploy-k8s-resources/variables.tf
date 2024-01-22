@@ -11,5 +11,5 @@ variable "kong_enterprise" {
 variable "kong_version" {
   description = "Kong version to deploy"
   type =  string
-  default = "3.5"
+  default = "3.4"
 }

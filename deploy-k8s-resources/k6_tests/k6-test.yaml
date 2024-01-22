@@ -27,10 +27,10 @@ spec:
       successThreshold: 1
     resources:
       limits:
-        cpu: 12000m
+        cpu: 24000m
         memory: 26Gi
       requests:
-        cpu: 10000m
+        cpu: 12000m
         memory: 13Gi
     env:
       - name: K6_PROMETHEUS_RW_TREND_STATS

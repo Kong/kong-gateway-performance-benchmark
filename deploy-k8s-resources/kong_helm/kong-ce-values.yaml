@@ -7,7 +7,7 @@ env:
   prefix: /kong_prefix/
   database: "off"
   # TODO: set this based on node cores
-  nginx_worker_processes: 16
+  nginx_worker_processes: 32
 
 proxy:
   annotations:

@@ -18,3 +18,9 @@ variable "instance_type" {
   type = string
   default = "c5.4xlarge"
 }
+
+variable "instance_type_kong" {
+  description = "EKS node instance type for kong"
+  type = string
+  default = "c5.metal"
+}
