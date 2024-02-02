@@ -1,8 +1,5 @@
 # Basic values.yaml configuration for Kong for Kubernetes (with the ingress controller)
 
-image:
-  repository: kong
-
 env:
   prefix: /kong_prefix/
   database: "off"
