@@ -11,7 +11,7 @@ variable "kong_enterprise" {
 variable "kong_repository" {
   description = "Kong image repository"
   type =  string
-  default = "kong/kong-gateway"
+  default = "kong/kong"
 }
 
 variable "kong_version" {
