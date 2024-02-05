@@ -7,9 +7,6 @@
 # further configuration to add them:
 # kubectl port-forward deploy/your-deployment-kong 8001:8001 8002:8002
 
-image:
-  repository: kong/kong-gateway
-
 proxy:
   annotations:
     prometheus.io/scrape: "true"

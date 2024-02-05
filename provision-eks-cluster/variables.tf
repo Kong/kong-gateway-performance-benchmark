@@ -16,11 +16,11 @@ variable "cluster_name" {
 variable "instance_type" {
   description = "EKS node instance type"
   type = string
-  default = "c5.4xlarge"
+  default = "c5.metal"
 }
 
 variable "instance_type_kong" {
   description = "EKS node instance type for kong"
   type = string
-  default = "c5.metal"
+  default = "c5.4xlarge"
 }
