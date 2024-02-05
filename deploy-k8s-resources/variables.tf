@@ -25,3 +25,10 @@ variable "kong_effective_semver" {
   type =  string
   default = null
 }
+
+variable "kong_worker_processes" {
+
+  description = "Number of nginx worker processes, set this to be the same as the number of CPU cores allocated to Kong"
+  type = number
+  default = 16
+}
