@@ -43,6 +43,11 @@ resource "helm_release" "kong" {
     }
   }
 
+  set {
+    name = "env.nginx_worker_processes"
+    value = var.kong_worker_processes
+  }
+
   depends_on = [ kubernetes_namespace.kong ]
 }
 
