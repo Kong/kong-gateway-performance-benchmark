@@ -25,8 +25,22 @@ resource "helm_release" "kong" {
   ]
 
   set {
+    name = "image.repository"
+    value = var.kong_repository
+  }
+
+  set {
     name = "image.tag"
     value = var.kong_version
+  }
+
+
+  dynamic "set" {
+    for_each = compact([var.kong_effective_semver])
+    content {
+      name = "image.effectiveSemver"
+      value = var.kong_effective_semver
+    }
   }
 
   depends_on = [ kubernetes_namespace.kong ]
