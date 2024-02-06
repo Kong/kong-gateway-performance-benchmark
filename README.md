@@ -9,6 +9,7 @@ Scripts to deploy:
 
 
 Run `provision-eks-cluster` terraform scripts first to create the EKS cluster
+
 First, you need to make sure you have proper authentication to interact with [AWS](https://docs.aws.amazon.com/cli/latest/userguide/sso-configure-profile-token.html)
 ```
 aws sso login
