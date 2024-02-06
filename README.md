@@ -111,6 +111,7 @@ kubectl top pod -n observability
 ```
 
 You can also view the metrics in realtime via grafana
+
 First find the grafana pod via command like 
 ```
 kubectl get pods -n observability 
@@ -137,3 +138,4 @@ It will probably will ask you to login for the first time, the default username 
 kubectl get secret --namespace observability grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
 ```
 
+![](grafana.gif)
