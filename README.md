@@ -38,7 +38,7 @@ ip-10-0-3-91.us-west-2.compute.internal    Ready    <none>   25m   v1.27.7-eks-e
 Next, you can start the deployment of kong and all the other services. Please note, if you want to test [Kong Enterprise](https://konghq.com/products/kong-enterprise), there are some extra setup required before you run the terraform scripts in `deploy-k8s-resources`
 
 Extra configurations for [Kong Enterprise](https://konghq.com/products/kong-enterprise)
-1. Update [license.json](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/license.json) with a valid `license.json` to start Kong Enterprise. If you don't have one, please reach out to [team](bizdev@konghq.com) for a temporary testing license.
+1. Update [license.json](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/license.json) with a valid `license.json` to start Kong Enterprise. If you don't have one, please reach out to [team](mailto:bizdev@konghq.com?subject=[GitHub]%20Source%20Han%20Sans) for a temporary testing license.
 2. Add terraform variables
 ```
 export TF_VAR_kong_enterprise=true
@@ -67,9 +67,10 @@ curl -i --insecure -X GET https://YOUR-AWS-ELB-ENDPOINT.REGION.elb.amazonaws.com
 
 The default setup is 1 service/route and no plugin enabled, to enable other kong configurations, you need to navigate to `deploy-k8s-resources/kong_helm` and apply the `.yaml` you need. 
 
-There is also scripts in the `deploy-k8s-resources/kong_helm` folder that could help you generate more kong config data([service/route](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/upstream-generator.sh), [consumers](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/consumer-generator.sh), [basic-auth](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/basic-auth-testuser-secret-generator.sh), [key-auth](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/key-auth-testuser-secret-generator.sh)) you need. 
+There are also scripts in the `deploy-k8s-resources/kong_helm` folder that could help you generate more kong config data([service/route](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/upstream-generator.sh), [consumers](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/consumer-generator.sh), [basic-auth](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/basic-auth-testuser-secret-generator.sh), [key-auth](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/kong_helm/key-auth-testuser-secret-generator.sh)) you need. 
 
 Here are some examples about how you can apply some of the kong configurations
+
 Deploy other k8s resources:
 ```
 kubectl apply -f prometheus-plugin.yaml -n kong
@@ -81,13 +82,13 @@ kubectl apply -f consumer-testuser.yaml -n kong
 kubectl apply -f basic-auth-plugin.yaml -n kong
 
 # To enable key-auth
-kubectl apply -f basic-auth-plugin.yaml -n kong
+kubectl apply -f key-auth-plugin.yaml -n kong
 
 ```
 
 If you want to run the tests, you can navigate to `deploy-k8s-resources/k6_tests` folder, and trigger the test with running the `run_k6_tests.sh` script. you can run `bash run_k6_tests.sh --help` to see what input is expected while running the script. An example of running the test would be: 
 ```
-bash run_k6_tests.sh k6_tests_01.js 1 200 1800s false false 
+bash run_k6_tests.sh k6_tests_01.js 1 300 900s false false 
 ```
 
 After triggering the k6 tests, you can check to see whether the k6 test is running by command like below:
@@ -99,7 +100,7 @@ k6-kong-1-f49x6                                      0/1     Running     0      
 k6-kong-initializer-f5w5j                            0/1     Completed   0          2m1s
 ```
 
-Please note, in our default setup for [k6](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/provision-eks-cluster/variables.tf) tooling, we are using [c5.metal](https://aws.amazon.com/ec2/instance-types/c5/), it might be too powerful/expensive for some users. We use it as default because `k6` is very resources demanding when running [high load performance tests](https://k6.io/docs/testing-guides/running-large-tests/#hardware-considerations). If you decided to use a less powerful machine for `k6`, you need adjust the default setup of the `resources` required for [k6-test.yaml](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/k6_tests/k6-test.yaml)
+Please note, in our default setup for [k6](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/provision-eks-cluster/variables.tf) tooling, we are using [c5.metal](https://aws.amazon.com/ec2/instance-types/c5/), it might be too powerful/expensive for some users. We use it as default because `k6` is very resources demanding when running [high load performance tests](https://k6.io/docs/testing-guides/running-large-tests/#hardware-considerations). If you decided to use a less powerful machine for `k6`, you need to adjust the default setup of the `resources` required for [k6-test.yaml](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/deploy-k8s-resources/k6_tests/k6-test.yaml)
 
 
 You can monitor the pod CPU/MEM metrics with [metrics-server](https://github.com/kubernetes-sigs/metrics-server) with command like 
