@@ -17,7 +17,7 @@ variable "kong_repository" {
 variable "kong_version" {
   description = "Kong version to deploy"
   type =  string
-  default = "3.5"
+  default = "3.6"
 }
 
 variable "kong_effective_semver" {

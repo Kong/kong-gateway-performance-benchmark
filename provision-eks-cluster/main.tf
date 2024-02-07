@@ -74,13 +74,13 @@ module "eks" {
 
       min_size     = 1
       max_size     = 3
-      desired_size = 2
+      desired_size = 1
     }
 
     two = {
       name = "node-group-2"
 
-      instance_types = [var.instance_type]
+      instance_types = [var.instance_type_kong]
 
       min_size     = 1
       max_size     = 2

@@ -96,6 +96,15 @@ resource "helm_release" "grafana" {
   ]
 }
 
+resource "helm_release" "metrics-server" {
+  name       = "metrics-server"
+  repository = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart      = "metrics-server"
+  namespace  = "observability"
+  depends_on = [ kubernetes_namespace.observability ]
+  version    = "3.11.0"
+}
+
 resource "helm_release" "redis" {
   name = "redis"
   chart = "bitnamicharts/redis"
