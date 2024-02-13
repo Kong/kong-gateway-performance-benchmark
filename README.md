@@ -140,3 +140,6 @@ kubectl get secret --namespace observability grafana -o jsonpath="{.data.admin-p
 ```
 
 ![](grafana.gif)
+
+## License
+[Apache 2.0 License](https://github.com/Kong/kong-gateway-performance-benchmark/blob/main/LICENSE)
