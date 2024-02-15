@@ -1,0 +1,11 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser1
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser1
+custom_id: testuser1
+credentials:
+- test-user-basic-auth
+- test-user-key-auth

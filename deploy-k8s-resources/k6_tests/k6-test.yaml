@@ -1,0 +1,69 @@
+apiVersion: k6.io/v1alpha1
+kind: TestRun
+metadata:
+  name: k6-kong
+spec:
+  parallelism: 1
+  script:
+    configMap:
+      name: kong-load-test
+      file: test.js
+  runner:
+    livenessProbe:
+      httpGet:
+        path: /v1/status
+        port: 6565
+      initialDelaySeconds: 180
+      periodSeconds: 30
+      failureThreshold: 6
+      successThreshold: 1
+    readinessProbe:
+      httpGet:
+        path: /v1/status
+        port: 6565
+      initialDelaySeconds: 180
+      periodSeconds: 30
+      failureThreshold: 6
+      successThreshold: 1
+    resources:
+      limits:
+        cpu: 60000m
+        memory: 50Gi
+      requests:
+        cpu: 24000m
+        memory: 18Gi
+    env:
+      - name: K6_PROMETHEUS_RW_TREND_STATS
+        value: 'avg,p(90),p(95),p(99),min,max,med,med,count,sum'
+      - name: K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM
+        value: 'true'
+      - name: K6_PROMETHEUS_RW_SERVER_URL
+        value: 'http://prometheus-server.observability.svc.cluster.local/api/v1/write'
+      - name: K6_INSECURE_SKIP_TLS_VERIFY
+        value: 'true'
+      - name: K6_OUT
+        value: experimental-prometheus-rw
+      - name: ENTITY_CONFIG_SIZE
+        value: '1'
+      - name: K6_VUS
+        value: '50'
+      - name: k6_DURATION
+        value: '60s'
+      - name: BASIC_AUTH_ENABLED
+        value: 'false'
+      - name: KEY_AUTH_ENABLED
+        value: 'false'
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - kong-kong
+                - upstream
+            topologyKey: topology.kubernetes.io/zone
+  arguments: --tag testid=k6-test

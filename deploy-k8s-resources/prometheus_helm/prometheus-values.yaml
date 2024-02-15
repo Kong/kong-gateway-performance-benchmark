@@ -1,0 +1,7 @@
+server:
+  extraFlags:
+  - web.enable-remote-write-receiver
+  extraArgs:
+    enable-feature: native-histograms
+  global:
+    scrape_interval: 10s

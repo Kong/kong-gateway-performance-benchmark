@@ -1,0 +1,1200 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser1
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser1
+custom_id: testuser1
+credentials:
+- test-user-basic-auth-1
+- test-user-key-auth-1
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser2
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser2
+custom_id: testuser2
+credentials:
+- test-user-basic-auth-2
+- test-user-key-auth-2
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser3
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser3
+custom_id: testuser3
+credentials:
+- test-user-basic-auth-3
+- test-user-key-auth-3
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser4
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser4
+custom_id: testuser4
+credentials:
+- test-user-basic-auth-4
+- test-user-key-auth-4
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser5
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser5
+custom_id: testuser5
+credentials:
+- test-user-basic-auth-5
+- test-user-key-auth-5
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser6
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser6
+custom_id: testuser6
+credentials:
+- test-user-basic-auth-6
+- test-user-key-auth-6
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser7
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser7
+custom_id: testuser7
+credentials:
+- test-user-basic-auth-7
+- test-user-key-auth-7
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser8
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser8
+custom_id: testuser8
+credentials:
+- test-user-basic-auth-8
+- test-user-key-auth-8
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser9
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser9
+custom_id: testuser9
+credentials:
+- test-user-basic-auth-9
+- test-user-key-auth-9
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser10
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser10
+custom_id: testuser10
+credentials:
+- test-user-basic-auth-10
+- test-user-key-auth-10
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser11
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser11
+custom_id: testuser11
+credentials:
+- test-user-basic-auth-11
+- test-user-key-auth-11
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser12
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser12
+custom_id: testuser12
+credentials:
+- test-user-basic-auth-12
+- test-user-key-auth-12
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser13
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser13
+custom_id: testuser13
+credentials:
+- test-user-basic-auth-13
+- test-user-key-auth-13
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser14
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser14
+custom_id: testuser14
+credentials:
+- test-user-basic-auth-14
+- test-user-key-auth-14
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser15
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser15
+custom_id: testuser15
+credentials:
+- test-user-basic-auth-15
+- test-user-key-auth-15
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser16
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser16
+custom_id: testuser16
+credentials:
+- test-user-basic-auth-16
+- test-user-key-auth-16
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser17
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser17
+custom_id: testuser17
+credentials:
+- test-user-basic-auth-17
+- test-user-key-auth-17
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser18
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser18
+custom_id: testuser18
+credentials:
+- test-user-basic-auth-18
+- test-user-key-auth-18
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser19
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser19
+custom_id: testuser19
+credentials:
+- test-user-basic-auth-19
+- test-user-key-auth-19
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser20
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser20
+custom_id: testuser20
+credentials:
+- test-user-basic-auth-20
+- test-user-key-auth-20
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser21
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser21
+custom_id: testuser21
+credentials:
+- test-user-basic-auth-21
+- test-user-key-auth-21
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser22
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser22
+custom_id: testuser22
+credentials:
+- test-user-basic-auth-22
+- test-user-key-auth-22
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser23
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser23
+custom_id: testuser23
+credentials:
+- test-user-basic-auth-23
+- test-user-key-auth-23
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser24
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser24
+custom_id: testuser24
+credentials:
+- test-user-basic-auth-24
+- test-user-key-auth-24
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser25
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser25
+custom_id: testuser25
+credentials:
+- test-user-basic-auth-25
+- test-user-key-auth-25
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser26
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser26
+custom_id: testuser26
+credentials:
+- test-user-basic-auth-26
+- test-user-key-auth-26
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser27
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser27
+custom_id: testuser27
+credentials:
+- test-user-basic-auth-27
+- test-user-key-auth-27
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser28
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser28
+custom_id: testuser28
+credentials:
+- test-user-basic-auth-28
+- test-user-key-auth-28
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser29
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser29
+custom_id: testuser29
+credentials:
+- test-user-basic-auth-29
+- test-user-key-auth-29
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser30
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser30
+custom_id: testuser30
+credentials:
+- test-user-basic-auth-30
+- test-user-key-auth-30
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser31
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser31
+custom_id: testuser31
+credentials:
+- test-user-basic-auth-31
+- test-user-key-auth-31
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser32
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser32
+custom_id: testuser32
+credentials:
+- test-user-basic-auth-32
+- test-user-key-auth-32
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser33
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser33
+custom_id: testuser33
+credentials:
+- test-user-basic-auth-33
+- test-user-key-auth-33
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser34
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser34
+custom_id: testuser34
+credentials:
+- test-user-basic-auth-34
+- test-user-key-auth-34
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser35
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser35
+custom_id: testuser35
+credentials:
+- test-user-basic-auth-35
+- test-user-key-auth-35
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser36
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser36
+custom_id: testuser36
+credentials:
+- test-user-basic-auth-36
+- test-user-key-auth-36
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser37
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser37
+custom_id: testuser37
+credentials:
+- test-user-basic-auth-37
+- test-user-key-auth-37
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser38
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser38
+custom_id: testuser38
+credentials:
+- test-user-basic-auth-38
+- test-user-key-auth-38
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser39
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser39
+custom_id: testuser39
+credentials:
+- test-user-basic-auth-39
+- test-user-key-auth-39
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser40
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser40
+custom_id: testuser40
+credentials:
+- test-user-basic-auth-40
+- test-user-key-auth-40
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser41
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser41
+custom_id: testuser41
+credentials:
+- test-user-basic-auth-41
+- test-user-key-auth-41
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser42
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser42
+custom_id: testuser42
+credentials:
+- test-user-basic-auth-42
+- test-user-key-auth-42
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser43
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser43
+custom_id: testuser43
+credentials:
+- test-user-basic-auth-43
+- test-user-key-auth-43
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser44
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser44
+custom_id: testuser44
+credentials:
+- test-user-basic-auth-44
+- test-user-key-auth-44
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser45
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser45
+custom_id: testuser45
+credentials:
+- test-user-basic-auth-45
+- test-user-key-auth-45
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser46
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser46
+custom_id: testuser46
+credentials:
+- test-user-basic-auth-46
+- test-user-key-auth-46
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser47
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser47
+custom_id: testuser47
+credentials:
+- test-user-basic-auth-47
+- test-user-key-auth-47
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser48
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser48
+custom_id: testuser48
+credentials:
+- test-user-basic-auth-48
+- test-user-key-auth-48
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser49
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser49
+custom_id: testuser49
+credentials:
+- test-user-basic-auth-49
+- test-user-key-auth-49
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser50
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser50
+custom_id: testuser50
+credentials:
+- test-user-basic-auth-50
+- test-user-key-auth-50
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser51
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser51
+custom_id: testuser51
+credentials:
+- test-user-basic-auth-51
+- test-user-key-auth-51
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser52
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser52
+custom_id: testuser52
+credentials:
+- test-user-basic-auth-52
+- test-user-key-auth-52
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser53
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser53
+custom_id: testuser53
+credentials:
+- test-user-basic-auth-53
+- test-user-key-auth-53
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser54
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser54
+custom_id: testuser54
+credentials:
+- test-user-basic-auth-54
+- test-user-key-auth-54
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser55
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser55
+custom_id: testuser55
+credentials:
+- test-user-basic-auth-55
+- test-user-key-auth-55
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser56
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser56
+custom_id: testuser56
+credentials:
+- test-user-basic-auth-56
+- test-user-key-auth-56
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser57
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser57
+custom_id: testuser57
+credentials:
+- test-user-basic-auth-57
+- test-user-key-auth-57
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser58
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser58
+custom_id: testuser58
+credentials:
+- test-user-basic-auth-58
+- test-user-key-auth-58
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser59
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser59
+custom_id: testuser59
+credentials:
+- test-user-basic-auth-59
+- test-user-key-auth-59
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser60
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser60
+custom_id: testuser60
+credentials:
+- test-user-basic-auth-60
+- test-user-key-auth-60
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser61
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser61
+custom_id: testuser61
+credentials:
+- test-user-basic-auth-61
+- test-user-key-auth-61
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser62
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser62
+custom_id: testuser62
+credentials:
+- test-user-basic-auth-62
+- test-user-key-auth-62
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser63
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser63
+custom_id: testuser63
+credentials:
+- test-user-basic-auth-63
+- test-user-key-auth-63
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser64
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser64
+custom_id: testuser64
+credentials:
+- test-user-basic-auth-64
+- test-user-key-auth-64
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser65
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser65
+custom_id: testuser65
+credentials:
+- test-user-basic-auth-65
+- test-user-key-auth-65
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser66
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser66
+custom_id: testuser66
+credentials:
+- test-user-basic-auth-66
+- test-user-key-auth-66
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser67
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser67
+custom_id: testuser67
+credentials:
+- test-user-basic-auth-67
+- test-user-key-auth-67
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser68
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser68
+custom_id: testuser68
+credentials:
+- test-user-basic-auth-68
+- test-user-key-auth-68
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser69
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser69
+custom_id: testuser69
+credentials:
+- test-user-basic-auth-69
+- test-user-key-auth-69
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser70
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser70
+custom_id: testuser70
+credentials:
+- test-user-basic-auth-70
+- test-user-key-auth-70
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser71
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser71
+custom_id: testuser71
+credentials:
+- test-user-basic-auth-71
+- test-user-key-auth-71
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser72
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser72
+custom_id: testuser72
+credentials:
+- test-user-basic-auth-72
+- test-user-key-auth-72
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser73
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser73
+custom_id: testuser73
+credentials:
+- test-user-basic-auth-73
+- test-user-key-auth-73
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser74
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser74
+custom_id: testuser74
+credentials:
+- test-user-basic-auth-74
+- test-user-key-auth-74
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser75
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser75
+custom_id: testuser75
+credentials:
+- test-user-basic-auth-75
+- test-user-key-auth-75
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser76
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser76
+custom_id: testuser76
+credentials:
+- test-user-basic-auth-76
+- test-user-key-auth-76
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser77
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser77
+custom_id: testuser77
+credentials:
+- test-user-basic-auth-77
+- test-user-key-auth-77
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser78
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser78
+custom_id: testuser78
+credentials:
+- test-user-basic-auth-78
+- test-user-key-auth-78
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser79
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser79
+custom_id: testuser79
+credentials:
+- test-user-basic-auth-79
+- test-user-key-auth-79
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser80
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser80
+custom_id: testuser80
+credentials:
+- test-user-basic-auth-80
+- test-user-key-auth-80
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser81
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser81
+custom_id: testuser81
+credentials:
+- test-user-basic-auth-81
+- test-user-key-auth-81
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser82
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser82
+custom_id: testuser82
+credentials:
+- test-user-basic-auth-82
+- test-user-key-auth-82
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser83
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser83
+custom_id: testuser83
+credentials:
+- test-user-basic-auth-83
+- test-user-key-auth-83
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser84
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser84
+custom_id: testuser84
+credentials:
+- test-user-basic-auth-84
+- test-user-key-auth-84
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser85
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser85
+custom_id: testuser85
+credentials:
+- test-user-basic-auth-85
+- test-user-key-auth-85
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser86
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser86
+custom_id: testuser86
+credentials:
+- test-user-basic-auth-86
+- test-user-key-auth-86
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser87
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser87
+custom_id: testuser87
+credentials:
+- test-user-basic-auth-87
+- test-user-key-auth-87
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser88
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser88
+custom_id: testuser88
+credentials:
+- test-user-basic-auth-88
+- test-user-key-auth-88
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser89
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser89
+custom_id: testuser89
+credentials:
+- test-user-basic-auth-89
+- test-user-key-auth-89
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser90
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser90
+custom_id: testuser90
+credentials:
+- test-user-basic-auth-90
+- test-user-key-auth-90
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser91
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser91
+custom_id: testuser91
+credentials:
+- test-user-basic-auth-91
+- test-user-key-auth-91
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser92
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser92
+custom_id: testuser92
+credentials:
+- test-user-basic-auth-92
+- test-user-key-auth-92
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser93
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser93
+custom_id: testuser93
+credentials:
+- test-user-basic-auth-93
+- test-user-key-auth-93
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser94
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser94
+custom_id: testuser94
+credentials:
+- test-user-basic-auth-94
+- test-user-key-auth-94
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser95
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser95
+custom_id: testuser95
+credentials:
+- test-user-basic-auth-95
+- test-user-key-auth-95
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser96
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser96
+custom_id: testuser96
+credentials:
+- test-user-basic-auth-96
+- test-user-key-auth-96
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser97
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser97
+custom_id: testuser97
+credentials:
+- test-user-basic-auth-97
+- test-user-key-auth-97
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser98
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser98
+custom_id: testuser98
+credentials:
+- test-user-basic-auth-98
+- test-user-key-auth-98
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser99
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser99
+custom_id: testuser99
+credentials:
+- test-user-basic-auth-99
+- test-user-key-auth-99
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: testuser100
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: testuser100
+custom_id: testuser100
+credentials:
+- test-user-basic-auth-100
+- test-user-key-auth-100
+---

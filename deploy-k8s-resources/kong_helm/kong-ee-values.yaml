@@ -1,0 +1,49 @@
+# Basic values.yaml for Kong for Kubernetes with Kong Enterprise
+# Several settings (search for the string "CHANGEME") require user-provided
+# Secrets. These Secrets must be created before installation.
+#
+# This installation does not create an Ingress or LoadBalancer Service for
+# the Admin API or Kong Manager. They require port-forwards to access without
+# further configuration to add them:
+# kubectl port-forward deploy/your-deployment-kong 8001:8001 8002:8002
+
+proxy:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8100"
+
+admin:
+  enabled: false
+
+manager:
+  enabled: false
+
+enterprise:
+  enabled: true
+  license_secret: kong-enterprise-license
+  vitals:
+    enabled: false
+  portal:
+    enabled: false
+  rbac:
+    enabled: false
+  smtp:
+    enabled: false
+
+portal:
+  enabled: false
+
+portalapi:
+  enabled: false
+
+env:
+  prefix: /kong_prefix/
+  database: "off"
+
+ingressController:
+  enabled: true
+
+tolerations:
+  - key: "dedicated"
+    value: "kong"
+    effect: "NoSchedule"

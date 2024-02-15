@@ -1,0 +1,24 @@
+# Basic values.yaml configuration for Kong for Kubernetes (with the ingress controller)
+
+env:
+  prefix: /kong_prefix/
+  database: "off"
+
+proxy:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8100"
+
+manager:
+  enabled: false
+
+admin:
+  enabled: false
+
+ingressController:
+  enabled: true
+
+tolerations:
+  - key: "dedicated"
+    value: "kong"
+    effect: "NoSchedule"

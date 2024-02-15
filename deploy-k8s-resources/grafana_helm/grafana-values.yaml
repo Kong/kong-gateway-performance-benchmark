@@ -1,0 +1,53 @@
+grafana.ini:
+  server:
+    domain: localhost
+    root_url: "%(protocol)s://%(domain)s:%(http_port)s"
+    # serve_from_sub_path: true
+# ingress:
+#   enabled: true
+#   hosts: 
+#     - "localhost"
+#   path: "/grafana"
+#   ingressClassName: kong
+sidecar:
+  dashboards:
+    enabled: true
+datasources:
+ datasources.yaml:
+   apiVersion: 1
+   datasources:
+   - name: Prometheus
+     type: prometheus
+     url: http://prometheus-server.observability.svc.cluster.local
+     access: proxy
+     isDefault: true
+dashboards:
+  default:
+    k6-prometheus:
+      gnetId: 19665
+      revision: 2
+      datasource: Prometheus
+    k6-prometheus-native-histogram:
+      gnetId: 18030
+      revision: 8
+      datasource: Prometheus
+    kong:
+      gnetId: 7424
+      revision: 11
+      datasource: Prometheus
+    pod-monitor:
+      gnetId: 15055
+      revision: 7
+      datasource: Prometheus
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /var/lib/grafana/dashboards/default
