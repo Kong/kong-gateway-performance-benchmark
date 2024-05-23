@@ -39,6 +39,7 @@ portalapi:
 env:
   prefix: /kong_prefix/
   database: "off"
+  anonymous_reports: "off"
 
 ingressController:
   enabled: true
