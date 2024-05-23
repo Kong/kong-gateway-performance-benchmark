@@ -3,6 +3,7 @@
 env:
   prefix: /kong_prefix/
   database: "off"
+  anonymous_reports: "off"
 
 proxy:
   annotations:
