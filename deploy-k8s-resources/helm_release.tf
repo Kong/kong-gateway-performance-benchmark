@@ -107,11 +107,9 @@ resource "helm_release" "metrics-server" {
 
 resource "helm_release" "redis" {
   name = "redis"
-  chart = "bitnamicharts/redis"
-  repository = "oci://registry-1.docker.io"
+  chart = "${path.module}/redis-helm"
   namespace = "kong"
   depends_on = [ kubernetes_namespace.kong ]
-  version = "18.5.0"
 
   values = [
     file("${path.module}/redis-values.yaml")
