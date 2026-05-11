@@ -1,0 +1,57 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-proxy-advanced-chat-baseline
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  max_request_body_size: 1048576
+  model_name_header: true
+  response_streaming: allow
+  balancer:
+    algorithm: round-robin
+    latency_strategy: tpot
+    retries: 1
+    slots: 1000
+    hash_on_header: X-Kong-LLM-Request-ID
+    failover_criteria:
+      - error
+      - timeout
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+    tokens_count_strategy: total-tokens
+  targets:
+    - route_type: llm/v1/chat
+      logging:
+        log_payloads: false
+        log_statistics: false
+      model:
+        provider: openai
+        name: mock-gpt-4o-mini
+        options:
+          upstream_url: http://ai-openai-mock.upstream.svc.cluster.local:8080/v1/chat/completions
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-chat-baseline
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-proxy-advanced-chat-baseline
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: ai-openai-mock
+                port:
+                  number: 8080
+            path: /ai-chat
+            pathType: ImplementationSpecific

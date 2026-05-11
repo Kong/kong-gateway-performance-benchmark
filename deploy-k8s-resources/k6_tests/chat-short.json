@@ -1,0 +1,9 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Return the exact string kong-benchmark-ok"
+    }
+  ],
+  "max_tokens": 100
+}

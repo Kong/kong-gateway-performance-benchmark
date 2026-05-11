@@ -92,6 +92,110 @@ If you want to run the tests, you can navigate to `deploy-k8s-resources/k6_tests
 bash run_k6_tests.sh k6_tests_01.js 1 300 900s false false 
 ```
 
+### AI Gateway phase 1 baseline
+
+The repository now includes a first-pass **AI Gateway phase 1 baseline** for:
+
+- `ai-proxy-advanced`
+- OpenAI-compatible chat completions
+- deterministic mock upstream
+- k6 constant-arrival-rate load
+
+This baseline is intended for **Kong Enterprise**, because `ai-proxy-advanced` is an enterprise plugin.
+
+#### 1. Re-apply Terraform after pulling the changes
+
+This updates:
+
+- the k6 ConfigMap with `k6_ai_chat_baseline.js` and `chat-short.json`
+- the deterministic mock upstream deployment/service in the `upstream` namespace
+
+From `deploy-k8s-resources/`:
+
+```bash
+terraform apply -auto-approve YOUR_PLAN_NAME.plan
+```
+
+If you prefer, create a fresh plan before applying.
+
+#### 2. Apply the AI plugin + route manifest
+
+```bash
+kubectl apply -f deploy-k8s-resources/kong_helm/ai-proxy-advanced-chat-baseline.yaml
+```
+
+This creates:
+
+- a namespaced `KongPlugin` for `ai-proxy-advanced`
+- an ingress route at `/ai-chat`
+
+#### 3. Smoke test the route
+
+Replace `YOUR-AWS-ELB-ENDPOINT` with your Kong proxy endpoint:
+
+```bash
+curl --insecure -X POST "https://YOUR-AWS-ELB-ENDPOINT/ai-chat" \
+  -H "content-type: application/json" \
+  --data @deploy-k8s-resources/k6_tests/chat-short.json
+```
+
+Expected response characteristics:
+
+- HTTP `200`
+- `choices[0].message.content == "kong-benchmark-ok"`
+- `usage.prompt_tokens`, `usage.completion_tokens`, and `usage.total_tokens` are present
+
+#### 4. Run the AI baseline
+
+From `deploy-k8s-resources/k6_tests/`:
+
+```bash
+bash run_ai_chat_baseline.sh
+```
+
+Optional arguments:
+
+```bash
+bash run_ai_chat_baseline.sh \
+  https://kong-kong-proxy.kong.svc.cluster.local/ai-chat \
+  25 \
+  6m \
+  50 \
+  200
+```
+
+Argument order:
+
+1. `K6_AI_CHAT_URL`
+2. `K6_AI_RATE`
+3. `K6_AI_DURATION`
+4. `K6_AI_PRE_ALLOCATED_VUS`
+5. `K6_AI_MAX_VUS`
+
+#### 5. Capture infra metrics
+
+From `deploy-k8s-resources/k6_tests/`:
+
+```bash
+bash extract_infra_metrics.sh
+```
+
+This prints a point-in-time snapshot of:
+
+- pod CPU/memory in `kong`, `upstream`, and `k6`
+- node metrics
+- restart summaries for Kong, upstream, and k6 pods
+
+#### Files added for the phase 1 baseline
+
+- `deploy-k8s-resources/ai_upstream/server.js`
+- `deploy-k8s-resources/k6_tests/k6_ai_chat_baseline.js`
+- `deploy-k8s-resources/k6_tests/chat-short.json`
+- `deploy-k8s-resources/k6_tests/k6-ai-chat-test.yaml`
+- `deploy-k8s-resources/k6_tests/run_ai_chat_baseline.sh`
+- `deploy-k8s-resources/k6_tests/extract_infra_metrics.sh`
+- `deploy-k8s-resources/kong_helm/ai-proxy-advanced-chat-baseline.yaml`
+
 After triggering the k6 tests, you can check to see whether the k6 test is running by command like below:
 ```
 kubectl get pods -n k6
