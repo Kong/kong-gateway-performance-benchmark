@@ -1,3 +1,6 @@
 auth:
   password: redispassword1
 
+master:
+  persistence:
+    storageClass: gp2

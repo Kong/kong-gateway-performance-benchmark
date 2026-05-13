@@ -2,33 +2,39 @@ variable "region" {
   default = "us-west-2"
 }
 
+variable "eks_state_workspace" {
+  description = "Workspace in provision-eks-cluster whose state should be used for the target EKS cluster. Defaults to the current workspace, falling back to the default state file."
+  type        = string
+  default     = null
+}
+
 variable "kong_enterprise" {
   description = "Use Kong Enterprise?"
-  type = bool
-  default = false
+  type        = bool
+  default     = false
 }
 
 variable "kong_repository" {
   description = "Kong image repository"
-  type =  string
-  default = "kong/kong"
+  type        = string
+  default     = "kong/kong"
 }
 
 variable "kong_version" {
   description = "Kong version to deploy"
-  type =  string
-  default = "3.6"
+  type        = string
+  default     = "3.6"
 }
 
 variable "kong_effective_semver" {
   description = "Semantic version, required if using a kong_version that does not look like a semver, e.g. 'nightly'"
-  type =  string
-  default = null
+  type        = string
+  default     = null
 }
 
 variable "kong_worker_processes" {
 
   description = "Number of nginx worker processes, set this to be the same as the number of CPU cores allocated to Kong"
-  type = number
-  default = 16
+  type        = number
+  default     = 16
 }

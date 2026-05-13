@@ -3,5 +3,11 @@ server:
   - web.enable-remote-write-receiver
   extraArgs:
     enable-feature: native-histograms
+  persistentVolume:
+    storageClass: gp2
   global:
     scrape_interval: 10s
+
+alertmanager:
+  persistence:
+    storageClass: gp2

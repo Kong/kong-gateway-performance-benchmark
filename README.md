@@ -61,6 +61,19 @@ terraform plan -out YOUR_PLAN_NAME.plan -input=false
 terraform apply -auto-approve YOUR_PLAN_NAME.plan
 ```
 
+If you created the EKS cluster from a Terraform workspace, make sure `deploy-k8s-resources` reads that same `provision-eks-cluster` state. You can either use the same workspace name in both directories or set it explicitly before planning:
+```
+export TF_VAR_eks_state_workspace=YOUR_EKS_WORKSPACE
+```
+
+For example, if the cluster was created from the `metal4` workspace:
+```
+export TF_VAR_eks_state_workspace=metal4
+terraform plan -out YOUR_PLAN_NAME.plan -input=false
+```
+
+On EKS, Prometheus and Redis need a usable storage class for their PVCs. This repo now requests `gp2` explicitly so those Helm releases do not depend on the cluster having a default `StorageClass`.
+
 After all the pods are up and running, try to reach kong with endpoint like 
 ```
 curl -i --insecure -X GET https://YOUR-AWS-ELB-ENDPOINT.REGION.elb.amazonaws.com/upstream/json/valid
@@ -94,14 +107,45 @@ bash run_k6_tests.sh k6_tests_01.js 1 300 900s false false
 
 ### AI Gateway phase 1 baseline
 
-The repository now includes a first-pass **AI Gateway phase 1 baseline** for:
+The repository now includes an initial **AI Gateway performance harness** for **Kong Enterprise** using the `ai-proxy-advanced` plugin.
 
-- `ai-proxy-advanced`
-- OpenAI-compatible chat completions
-- deterministic mock upstream
-- k6 constant-arrival-rate load
+Current scope:
 
-This baseline is intended for **Kong Enterprise**, because `ai-proxy-advanced` is an enterprise plugin.
+- OpenAI-compatible **chat completions**
+- deterministic in-cluster mock upstream
+- single `/ai-chat` route
+- k6 **constant-arrival-rate** workload
+- lightweight infra snapshot helper for pod/node CPU and memory
+
+This is a practical starting point for **Phase 0 bring-up** and **Phase 1 baseline** work. It lets the team validate that the full path works end-to-end before moving on to higher-rate runs, policy-overhead experiments, or more advanced AI workloads.
+
+#### Why these changes were added
+
+The goal of this baseline is to give the team a reproducible AI Gateway perf path without depending on an external model provider.
+
+Why the harness uses a deterministic mock upstream:
+
+- removes provider-side variability from the first baseline
+- avoids external API keys and network dependency for basic validation
+- returns a stable response body and `usage` payload so the k6 checks are simple and repeatable
+- gives us a clean foundation to scale request rate and observe Kong CPU/memory behavior
+
+#### What this harness can do today
+
+- prove that `ai-proxy-advanced` is wired correctly
+- smoke-test the `/ai-chat` route
+- run a first non-streaming AI baseline
+- start controlled rate-scaling experiments
+- collect basic observability data during or after runs
+
+#### What this harness does **not** do yet
+
+- it is **not** a complete AI Gateway benchmark suite
+- it does **not** cover SSE / streaming chat yet
+- it does **not** model real provider latency or token streaming behavior
+- it should not yet be treated as a definitive Kong saturation test without additional rate-scaling and better peak-time metric capture
+
+#### Quick start
 
 #### 1. Re-apply Terraform after pulling the changes
 
@@ -119,6 +163,8 @@ terraform apply -auto-approve YOUR_PLAN_NAME.plan
 If you prefer, create a fresh plan before applying.
 
 #### 2. Apply the AI plugin + route manifest
+
+From the repository root:
 
 ```bash
 kubectl apply -f deploy-k8s-resources/kong_helm/ai-proxy-advanced-chat-baseline.yaml
@@ -145,15 +191,31 @@ Expected response characteristics:
 - `choices[0].message.content == "kong-benchmark-ok"`
 - `usage.prompt_tokens`, `usage.completion_tokens`, and `usage.total_tokens` are present
 
-#### 4. Run the AI baseline
+> Note: in some environments the Terraform output may print the ELB as `http://...`, but the actual Kong proxy path behaves as HTTPS-first. For smoke tests, prefer `https://...` with `--insecure`.
+
+#### 4. Run a small smoke test first
 
 From `deploy-k8s-resources/k6_tests/`:
 
 ```bash
-bash run_ai_chat_baseline.sh
+bash run_ai_chat_baseline.sh \
+  https://kong-kong-proxy.kong.svc.cluster.local/ai-chat \
+  2 \
+  1m \
+  5 \
+  20
 ```
 
-Optional arguments:
+This verifies:
+
+- the k6 job starts correctly
+- the in-cluster route works
+- the response body shape matches expectations
+- Prometheus remote write and basic observability are alive
+
+#### 5. Run the default Phase 1 A1 baseline
+
+From `deploy-k8s-resources/k6_tests/`:
 
 ```bash
 bash run_ai_chat_baseline.sh \
@@ -172,7 +234,7 @@ Argument order:
 4. `K6_AI_PRE_ALLOCATED_VUS`
 5. `K6_AI_MAX_VUS`
 
-#### 5. Capture infra metrics
+#### 6. Capture infra metrics
 
 From `deploy-k8s-resources/k6_tests/`:
 
@@ -186,7 +248,31 @@ This prints a point-in-time snapshot of:
 - node metrics
 - restart summaries for Kong, upstream, and k6 pods
 
-#### Files added for the phase 1 baseline
+For meaningful baseline comparison, capture metrics **during** the run, not only after completion.
+
+#### Suggested first workflow
+
+Recommended order for new users:
+
+1. apply Terraform changes
+2. apply the AI route/plugin manifest
+3. confirm `/ai-chat` with the `curl` smoke test
+4. run the tiny k6 smoke test
+5. run the default Phase 1 A1 baseline
+6. increase only the request rate for follow-up experiments (for example 50, 100, 200 RPS)
+
+This order makes it much easier to diagnose problems than jumping straight to a large run.
+
+#### Suggested next experiments
+
+Once the default A1 baseline is working, useful next steps are:
+
+- stepped-rate runs to find where latency or errors start to bend
+- comparing runs with different mock response delays
+- testing larger request/response payload sizes
+- later, adding streaming/SSE scenarios
+
+#### Files added for the AI baseline
 
 - `deploy-k8s-resources/ai_upstream/server.js`
 - `deploy-k8s-resources/k6_tests/k6_ai_chat_baseline.js`

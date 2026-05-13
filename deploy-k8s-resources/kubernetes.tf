@@ -2,10 +2,18 @@ provider "aws" {
   region = var.region
 }
 
+locals {
+  eks_state_workspace = coalesce(var.eks_state_workspace, terraform.workspace)
+  eks_state_path = (
+    local.eks_state_workspace != "default" &&
+    fileexists("../provision-eks-cluster/terraform.tfstate.d/${local.eks_state_workspace}/terraform.tfstate")
+  ) ? "../provision-eks-cluster/terraform.tfstate.d/${local.eks_state_workspace}/terraform.tfstate" : "../provision-eks-cluster/terraform.tfstate"
+}
+
 data "terraform_remote_state" "eks" {
   backend = "local"
   config = {
-    path = "../provision-eks-cluster/terraform.tfstate"
+    path = local.eks_state_path
   }
 }
 
