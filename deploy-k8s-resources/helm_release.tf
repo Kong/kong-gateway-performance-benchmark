@@ -59,6 +59,10 @@ resource "helm_release" "k6" {
   namespace  = "k6"
   depends_on = [ kubernetes_namespace.k6 ]
 
+  values = [
+    file("${path.module}/k6_helm/k6-operator-values.yaml")
+  ]
+
   set {
     name = "namespace.create"
     value = false
@@ -103,6 +107,10 @@ resource "helm_release" "metrics-server" {
   namespace  = "observability"
   depends_on = [ kubernetes_namespace.observability ]
   version    = "3.11.0"
+
+  values = [
+    file("${path.module}/metrics_server_helm/metrics-server-values.yaml")
+  ]
 }
 
 resource "helm_release" "redis" {

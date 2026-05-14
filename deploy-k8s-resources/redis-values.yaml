@@ -4,3 +4,10 @@ auth:
 master:
   persistence:
     storageClass: gp2
+  nodeSelector:
+    benchmark.konghq.com/node-role: support
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: support
+      effect: NoSchedule

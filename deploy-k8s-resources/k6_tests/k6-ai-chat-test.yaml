@@ -4,11 +4,34 @@ metadata:
   name: k6-ai-chat
 spec:
   parallelism: 1
+  initializer:
+    nodeSelector:
+      benchmark.konghq.com/node-role: loadgen
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: loadgen
+        effect: NoSchedule
   script:
     configMap:
       name: kong-load-test
       file: k6_ai_chat_baseline.js
+  starter:
+    nodeSelector:
+      benchmark.konghq.com/node-role: loadgen
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: loadgen
+        effect: NoSchedule
   runner:
+    nodeSelector:
+      benchmark.konghq.com/node-role: loadgen
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: loadgen
+        effect: NoSchedule
     livenessProbe:
       httpGet:
         path: /v1/status

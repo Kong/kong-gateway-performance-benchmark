@@ -19,7 +19,11 @@ admin:
 ingressController:
   enabled: true
 
+nodeSelector:
+  benchmark.konghq.com/node-role: kong
+
 tolerations:
   - key: "dedicated"
+    operator: "Equal"
     value: "kong"
     effect: "NoSchedule"

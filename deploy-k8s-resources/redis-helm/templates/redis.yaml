@@ -271,10 +271,14 @@ spec:
               weight: 1
         nodeAffinity:
           
+      {{- with .Values.master.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.master.tolerations }}
       tolerations:
-        - effect: NoSchedule
-          key: dedicated
-          value: kong
+{{ toYaml . | indent 8 }}
+      {{- end }}
       enableServiceLinks: true
       terminationGracePeriodSeconds: 30
       containers:

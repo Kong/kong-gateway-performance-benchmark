@@ -122,6 +122,17 @@ resource "kubernetes_deployment" "upstream" {
         }
       }
       spec {
+        node_selector = {
+          "benchmark.konghq.com/node-role" = "support"
+        }
+
+        toleration {
+          key      = "dedicated"
+          operator = "Equal"
+          value    = "support"
+          effect   = "NoSchedule"
+        }
+
         container {
           command = [
             "./go-bench-suite",
@@ -155,6 +166,17 @@ resource "kubernetes_deployment" "ai_openai_mock" {
         }
       }
       spec {
+        node_selector = {
+          "benchmark.konghq.com/node-role" = "support"
+        }
+
+        toleration {
+          key      = "dedicated"
+          operator = "Equal"
+          value    = "support"
+          effect   = "NoSchedule"
+        }
+
         container {
           image = "node:20-alpine"
           name  = "ai-openai-mock"

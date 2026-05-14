@@ -23,13 +23,19 @@ variable "ebs_csi_addon_version" {
 }
 
 variable "instance_type" {
-  description = "EKS node instance type"
+  description = "EKS node instance type for k6/load generation"
   type = string
   default = "c5.metal"
 }
 
 variable "instance_type_kong" {
-  description = "EKS node instance type for kong"
+  description = "EKS node instance type for Kong data plane"
   type = string
   default = "c5.4xlarge"
+}
+
+variable "instance_type_support" {
+  description = "EKS node instance type for observability, Redis, and mock upstream services"
+  type        = string
+  default     = "c5.2xlarge"
 }

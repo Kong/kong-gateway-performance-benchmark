@@ -5,9 +5,41 @@ server:
     enable-feature: native-histograms
   persistentVolume:
     storageClass: gp2
+  nodeSelector:
+    benchmark.konghq.com/node-role: support
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: support
+      effect: NoSchedule
   global:
     scrape_interval: 10s
 
 alertmanager:
   persistence:
     storageClass: gp2
+  nodeSelector:
+    benchmark.konghq.com/node-role: support
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: support
+      effect: NoSchedule
+
+kube-state-metrics:
+  nodeSelector:
+    benchmark.konghq.com/node-role: support
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: support
+      effect: NoSchedule
+
+prometheus-pushgateway:
+  nodeSelector:
+    benchmark.konghq.com/node-role: support
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: support
+      effect: NoSchedule

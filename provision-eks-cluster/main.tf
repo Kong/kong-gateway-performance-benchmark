@@ -72,6 +72,18 @@ module "eks" {
       min_size     = 1
       max_size     = 3
       desired_size = 1
+
+      labels = {
+        "benchmark.konghq.com/node-role" = "loadgen"
+      }
+
+      taints = {
+        dedicated = {
+          key    = "dedicated"
+          value  = "loadgen"
+          effect = "NO_SCHEDULE"
+        }
+      }
     }
 
     two = {
@@ -83,12 +95,30 @@ module "eks" {
       max_size     = 2
       desired_size = 1
 
+      labels = {
+        "benchmark.konghq.com/node-role" = "kong"
+      }
+
       taints = {
         dedicated = {
-      key    = "dedicated"
-      value  = "kong"
-      effect = "NO_SCHEDULE"
+          key    = "dedicated"
+          value  = "kong"
+          effect = "NO_SCHEDULE"
         }
+      }
+    }
+
+    support = {
+      name = "node-group-support"
+
+      instance_types = [var.instance_type_support]
+
+      min_size     = 1
+      max_size     = 2
+      desired_size = 1
+
+      labels = {
+        "benchmark.konghq.com/node-role" = "support"
       }
     }
   }
@@ -126,4 +156,9 @@ resource "aws_eks_addon" "ebs-csi" {
     "eks_addon" = "ebs-csi"
     "terraform" = "true"
   }
+
+  depends_on = [
+    module.eks,
+    module.irsa-ebs-csi,
+  ]
 }

@@ -17,3 +17,8 @@ output "cluster_name" {
   description = "Kubernetes Cluster Name"
   value       = module.eks.cluster_name
 }
+
+output "vpc_id" {
+  description = "VPC ID for the benchmark cluster"
+  value       = module.vpc.vpc_id
+}
