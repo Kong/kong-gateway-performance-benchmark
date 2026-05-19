@@ -25,12 +25,12 @@ resource "helm_release" "kong" {
   ]
 
   set {
-    name = "image.repository"
+    name  = "image.repository"
     value = var.kong_repository
   }
 
   set {
-    name = "image.tag"
+    name  = "image.tag"
     value = var.kong_version
   }
 
@@ -38,17 +38,17 @@ resource "helm_release" "kong" {
   dynamic "set" {
     for_each = compact([var.kong_effective_semver])
     content {
-      name = "image.effectiveSemver"
+      name  = "image.effectiveSemver"
       value = var.kong_effective_semver
     }
   }
 
   set {
-    name = "env.nginx_worker_processes"
+    name  = "env.nginx_worker_processes"
     value = var.kong_worker_processes
   }
 
-  depends_on = [ kubernetes_namespace.kong ]
+  depends_on = [kubernetes_namespace.kong]
 }
 
 
@@ -57,19 +57,19 @@ resource "helm_release" "k6" {
   repository = "https://grafana.github.io/helm-charts"
   chart      = "k6-operator"
   namespace  = "k6"
-  depends_on = [ kubernetes_namespace.k6 ]
+  depends_on = [kubernetes_namespace.k6]
 
   values = [
     file("${path.module}/k6_helm/k6-operator-values.yaml")
   ]
 
   set {
-    name = "namespace.create"
+    name  = "namespace.create"
     value = false
   }
 
   set {
-    name = "customLabels.app"
+    name  = "customLabels.app"
     value = "k6"
   }
 }
@@ -79,7 +79,7 @@ resource "helm_release" "prometheus" {
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "prometheus"
   namespace  = "observability"
-  depends_on = [ kubernetes_namespace.observability ]
+  depends_on = [kubernetes_namespace.observability]
   version    = "25.8.1"
 
   values = [
@@ -92,7 +92,7 @@ resource "helm_release" "grafana" {
   repository = "https://grafana.github.io/helm-charts"
   chart      = "grafana"
   namespace  = "observability"
-  depends_on = [ kubernetes_namespace.observability ]
+  depends_on = [kubernetes_namespace.observability]
   version    = "7.0.11"
 
   values = [
@@ -105,7 +105,7 @@ resource "helm_release" "metrics-server" {
   repository = "https://kubernetes-sigs.github.io/metrics-server/"
   chart      = "metrics-server"
   namespace  = "observability"
-  depends_on = [ kubernetes_namespace.observability ]
+  depends_on = [kubernetes_namespace.observability]
   version    = "3.11.0"
 
   values = [
@@ -114,10 +114,10 @@ resource "helm_release" "metrics-server" {
 }
 
 resource "helm_release" "redis" {
-  name = "redis"
-  chart = "${path.module}/redis-helm"
-  namespace = "kong"
-  depends_on = [ kubernetes_namespace.kong ]
+  name       = "redis"
+  chart      = "${path.module}/redis-helm"
+  namespace  = "kong"
+  depends_on = [kubernetes_namespace.kong]
 
   values = [
     file("${path.module}/redis-values.yaml")

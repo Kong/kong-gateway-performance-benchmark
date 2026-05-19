@@ -1,0 +1,268 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-static-chat
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  response_streaming: deny
+  max_request_body_size: 1048576
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    retries: 1
+    slots: 1000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+  targets:
+    - route_type: llm/v1/chat
+      auth:
+        allow_override: false
+      logging:
+        log_payloads: false
+        log_statistics: true
+      model:
+        provider: openai
+        name: wiremock-static-chat
+        options:
+          upstream_url: http://static-openai-mock.upstream.svc.cluster.local:8080/v1/chat/completions
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-token-chat-openai
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  response_streaming: allow
+  max_request_body_size: 10485760
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    retries: 1
+    slots: 1000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+  targets:
+    - route_type: llm/v1/chat
+      auth:
+        allow_override: false
+      logging:
+        log_payloads: false
+        log_statistics: true
+      model:
+        provider: openai
+        name: mock-gpt-4o-mini
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-token-stream-openai
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  response_streaming: allow
+  max_request_body_size: 10485760
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    retries: 1
+    slots: 1000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+  targets:
+    - route_type: llm/v1/chat
+      auth:
+        allow_override: false
+      logging:
+        log_payloads: false
+        log_statistics: true
+      model:
+        provider: openai
+        name: mock-gpt-4o-mini
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-token-stream-gemini
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: gemini
+  response_streaming: always
+  max_request_body_size: 10485760
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    retries: 1
+    slots: 1000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+  targets:
+    - route_type: llm/v1/chat
+      auth:
+        allow_override: false
+      logging:
+        log_payloads: false
+        log_statistics: true
+      model:
+        provider: gemini
+        name: mock-gemini-2.5-flash
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1beta/models/mock-gemini:streamGenerateContent
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-token-embeddings-openai
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  genai_category: text/embeddings
+  response_streaming: deny
+  max_request_body_size: 10485760
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    retries: 1
+    slots: 1000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+  targets:
+    - route_type: llm/v1/embeddings
+      logging:
+        log_payloads: false
+        log_statistics: true
+      model:
+        provider: openai
+        name: text-embedding-3-small
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/embeddings
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-static-chat
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-static-chat
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: static-openai-mock
+                port:
+                  number: 8080
+            path: /bench/static/chat
+            pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-token-chat-openai
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-token-chat-openai
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8080
+            path: /bench/token/chat/openai
+            pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-token-stream-openai
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-token-stream-openai
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8080
+            path: /bench/token/stream/openai
+            pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-token-stream-gemini
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-token-stream-gemini
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8080
+            path: /bench/token/stream/gemini/models/mock-gemini-2.5-flash:streamGenerateContent
+            pathType: ImplementationSpecific
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-token-embeddings-openai
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-token-embeddings-openai
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8080
+            path: /bench/token/embeddings/openai
+            pathType: ImplementationSpecific

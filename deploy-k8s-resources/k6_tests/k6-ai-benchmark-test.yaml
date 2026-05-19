@@ -1,0 +1,107 @@
+apiVersion: k6.io/v1alpha1
+kind: TestRun
+metadata:
+  name: k6-ai-benchmark
+spec:
+  parallelism: 1
+  paused: "false"
+  initializer:
+    nodeSelector:
+      benchmark.konghq.com/node-role: loadgen
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: loadgen
+        effect: NoSchedule
+  script:
+    configMap:
+      name: kong-load-test
+      file: k6_ai_token_chat.js
+  starter:
+    nodeSelector:
+      benchmark.konghq.com/node-role: loadgen
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: loadgen
+        effect: NoSchedule
+  runner:
+    nodeSelector:
+      benchmark.konghq.com/node-role: loadgen
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: loadgen
+        effect: NoSchedule
+    livenessProbe:
+      httpGet:
+        path: /v1/status
+        port: 6565
+      initialDelaySeconds: 180
+      periodSeconds: 30
+      failureThreshold: 6
+      successThreshold: 1
+    readinessProbe:
+      httpGet:
+        path: /v1/status
+        port: 6565
+      initialDelaySeconds: 180
+      periodSeconds: 30
+      failureThreshold: 6
+      successThreshold: 1
+    resources:
+      limits:
+        cpu: 60000m
+        memory: 50Gi
+      requests:
+        cpu: 24000m
+        memory: 18Gi
+    env:
+      - name: K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM
+        value: "true"
+      - name: K6_PROMETHEUS_RW_SERVER_URL
+        value: "http://prometheus-server.observability.svc.cluster.local/api/v1/write"
+      - name: K6_INSECURE_SKIP_TLS_VERIFY
+        value: "true"
+      - name: K6_OUT
+        value: experimental-prometheus-rw
+      - name: K6_AI_CHAT_URL
+        value: "https://kong-kong-proxy.kong.svc.cluster.local/bench/token/chat/openai"
+      - name: K6_AI_DURATION
+        value: "6m"
+      - name: K6_AI_RATE
+        value: "25"
+      - name: K6_AI_TIME_UNIT
+        value: "1s"
+      - name: K6_AI_PRE_ALLOCATED_VUS
+        value: "50"
+      - name: K6_AI_MAX_VUS
+        value: "200"
+      - name: K6_AI_STREAM_VUS
+        value: "25"
+      - name: K6_AI_TIMEOUT
+        value: "120s"
+      - name: K6_AI_FIXTURE
+        value: "short"
+      - name: K6_AI_MODEL
+        value: ""
+      - name: K6_AI_APIKEY
+        value: ""
+      - name: K6_AI_SCENARIO_NAME
+        value: ""
+      - name: K6_AI_CACHE_MODE
+        value: ""
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - kong-kong
+                      - upstream
+              topologyKey: topology.kubernetes.io/zone
+  arguments: --tag testid=k6-ai-benchmark

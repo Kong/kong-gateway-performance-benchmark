@@ -1,0 +1,66 @@
+{
+  "chat": {
+    "short": {
+      "prompt_tokens": 64,
+      "completion_tokens": 128,
+      "ttft_ms": 100,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 16
+    },
+    "medium": {
+      "prompt_tokens": 512,
+      "completion_tokens": 512,
+      "ttft_ms": 120,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 32
+    },
+    "long": {
+      "prompt_tokens": 2048,
+      "completion_tokens": 1024,
+      "ttft_ms": 150,
+      "tpot_ms": 5,
+      "tokens_per_chunk": 32
+    }
+  },
+  "stream": {
+    "short": {
+      "prompt_tokens": 64,
+      "completion_tokens": 256,
+      "ttft_ms": 120,
+      "tpot_ms": 5,
+      "tokens_per_chunk": 16
+    },
+    "medium": {
+      "prompt_tokens": 512,
+      "completion_tokens": 768,
+      "ttft_ms": 140,
+      "tpot_ms": 5,
+      "tokens_per_chunk": 24
+    },
+    "long": {
+      "prompt_tokens": 2048,
+      "completion_tokens": 1536,
+      "ttft_ms": 180,
+      "tpot_ms": 6,
+      "tokens_per_chunk": 32
+    }
+  },
+  "embeddings": {
+    "short": {
+      "prompt_tokens": 256
+    },
+    "medium": {
+      "prompt_tokens": 1024
+    },
+    "long": {
+      "prompt_tokens": 4096
+    }
+  },
+  "static": {
+    "chat": {
+      "prompt_tokens": 1000,
+      "completion_tokens": 200,
+      "expected_text": "wiremock-static-response"
+    }
+  }
+}

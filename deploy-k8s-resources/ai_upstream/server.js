@@ -6,6 +6,12 @@ const responseText = process.env.MOCK_RESPONSE_TEXT || 'kong-benchmark-ok'
 const defaultCompletionTokens = Number(process.env.MOCK_COMPLETION_TOKENS || 100)
 const responseModel = process.env.MOCK_MODEL || 'mock-gpt-4o-mini'
 
+function getHeaderNumber(req, headerName) {
+  const rawValue = req.headers[headerName]
+  const parsed = Number(Array.isArray(rawValue) ? rawValue[0] : rawValue)
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify(payload))
@@ -37,15 +43,22 @@ function collectPromptText(messages) {
     .join(' ')
 }
 
-function estimatePromptTokens(body) {
+function estimatePromptTokens(req, body) {
+  const promptTokensHeader = getHeaderNumber(req, 'x-llm-prompt-tokens')
+  if (Number.isFinite(promptTokensHeader)) {
+    return Math.max(1, Math.floor(promptTokensHeader))
+  }
+
   const text = collectPromptText(body.messages)
   return Math.max(1, Math.ceil(text.length / 4))
 }
 
-function buildChatCompletion(body) {
-  const promptTokens = estimatePromptTokens(body)
+function buildChatCompletion(req, body) {
+  const promptTokens = estimatePromptTokens(req, body)
+  const completionTokensHeader = getHeaderNumber(req, 'x-llm-completion-tokens')
   const requestedMaxTokens = Number.isFinite(body.max_tokens) ? body.max_tokens : defaultCompletionTokens
-  const completionTokens = Math.max(1, Math.min(requestedMaxTokens || defaultCompletionTokens, defaultCompletionTokens))
+  const completionBudget = Number.isFinite(completionTokensHeader) ? completionTokensHeader : requestedMaxTokens
+  const completionTokens = Math.max(1, Math.min(completionBudget || defaultCompletionTokens, defaultCompletionTokens))
 
   return {
     id: 'chatcmpl-kong-benchmark',
@@ -100,7 +113,7 @@ const server = http.createServer((req, res) => {
       return
     }
 
-    const payload = buildChatCompletion(parsed)
+    const payload = buildChatCompletion(req, parsed)
     setTimeout(() => sendJson(res, 200, payload), fixedDelayMs)
   })
 })

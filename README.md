@@ -74,6 +74,23 @@ terraform plan -out YOUR_PLAN_NAME.plan -input=false
 
 On EKS, Prometheus and Redis need a usable storage class for their PVCs. This repo now requests `gp2` explicitly so those Helm releases do not depend on the cluster having a default `StorageClass`.
 
+For longer-running performance work, the repo now uses a **role-based node topology** instead of relying on the Kubernetes scheduler to pack workloads wherever they fit.
+
+Default intended placement:
+
+- **loadgen node group**: k6 operator and k6 test pods
+- **kong node group**: Kong data plane / ingress controller pods
+- **support node group**: Redis, Prometheus, Grafana, metrics-server, mock upstream services, and cluster add-ons that do not tolerate the dedicated benchmark taints
+
+This is intentional. It improves result quality because the load generator, the gateway under test, and supporting services stop competing for the same node's CPU and memory.
+
+After pulling these topology changes:
+
+1. re-apply `provision-eks-cluster` so the node-group labels/taints and support node group exist
+2. re-apply `deploy-k8s-resources` so Helm/Kubernetes workloads pick up the new placement rules
+
+This does **not** change the logical benchmark flow. It changes where workloads run so the measurements are more trustworthy.
+
 After all the pods are up and running, try to reach kong with endpoint like 
 ```
 curl -i --insecure -X GET https://YOUR-AWS-ELB-ENDPOINT.REGION.elb.amazonaws.com/upstream/json/valid
@@ -242,6 +259,68 @@ From `deploy-k8s-resources/k6_tests/`:
 bash extract_infra_metrics.sh
 ```
 
+### AI benchmark suite v2
+
+The benchmark harness now supports:
+
+- static proxy comparison
+- token-aware OpenAI chat
+- OpenAI and Gemini streaming
+- embeddings
+- isolated **policy overhead** scenarios
+
+Apply the benchmark route suites:
+
+```bash
+kubectl apply -f deploy-k8s-resources/kong_helm/ai-benchmark-suite.yaml
+kubectl apply -f deploy-k8s-resources/kong_helm/ai-benchmark-policy-suite.yaml
+```
+
+Policy benchmark routes are additive and do not replace the existing proxy-only routes:
+
+- `/bench/policy/auth/openai`
+- `/bench/policy/rate-limit/openai`
+- `/bench/policy/token-budget/openai`
+- `/bench/policy/cache/openai`
+
+Policy benchmark scenarios:
+
+```bash
+cd deploy-k8s-resources/k6_tests
+
+bash run_ai_benchmark.sh policy-auth-openai short 25 6m
+bash run_ai_benchmark.sh policy-rate-limit short 25 6m
+bash run_ai_benchmark.sh policy-token-budget short 25 6m
+bash run_ai_benchmark.sh policy-cache-hit short 25 6m
+bash run_ai_benchmark.sh policy-cache-miss short 25 6m
+```
+
+Policy benchmark matrices:
+
+```bash
+bash run_ai_benchmark_matrix.sh v2-policy-smoke
+bash run_ai_benchmark_matrix.sh v2-policy-core
+```
+
+### Destroy the benchmark environment
+
+Destroy in the reverse order of creation: remove the Kubernetes/Helm resources first, then remove the EKS/VPC stack. If you destroy `provision-eks-cluster` first, AWS load balancers created by the Kong proxy service can still be attached to the VPC and Terraform will fail with `DependencyViolation` errors while deleting subnets or detaching the internet gateway.
+
+From the repository root:
+
+```bash
+aws sso login
+./destroy_eks_benchmark.sh --provision-workspace YOUR_EKS_WORKSPACE --deploy-workspace YOUR_DEPLOY_WORKSPACE
+```
+
+If both directories are already set to the right Terraform workspace, the flags are optional:
+
+```bash
+./destroy_eks_benchmark.sh
+```
+
+The helper script destroys `deploy-k8s-resources`, waits until AWS load balancers in the benchmark VPC are gone, and only then destroys `provision-eks-cluster`.
+
 This prints a point-in-time snapshot of:
 
 - pod CPU/memory in `kong`, `upstream`, and `k6`
@@ -272,6 +351,52 @@ Once the default A1 baseline is working, useful next steps are:
 - testing larger request/response payload sizes
 - later, adding streaming/SSE scenarios
 
+### AI benchmark suite v2
+
+The repository now also includes a broader AI benchmark suite built around two upstream modes:
+
+- **static mode** via **WireMock** for fixed-response proxy comparison
+- **token-aware mode** via the **fake provider** for token throughput, embeddings, and streaming studies
+
+Benchmark route families:
+
+- `/bench/static/chat`
+- `/bench/token/chat/openai`
+- `/bench/token/stream/openai`
+- `/bench/token/stream/gemini`
+- `/bench/token/embeddings/openai`
+
+Scenario runner:
+
+```bash
+cd deploy-k8s-resources/k6_tests
+bash run_ai_benchmark.sh --help
+```
+
+Examples:
+
+```bash
+bash run_ai_benchmark.sh token-chat-openai short 25 6m
+bash run_ai_benchmark.sh stream-openai short 30 6m
+bash run_ai_benchmark.sh embeddings-openai short 40 6m
+```
+
+Matrix helper:
+
+```bash
+bash run_ai_benchmark_matrix.sh v1-core
+```
+
+The matrix helper prints the canonical scenario commands in order. Run them one at a time so results and logs stay easy to interpret.
+
+Memory sampling helper:
+
+```bash
+bash sample_kong_worker_memory.sh 60 5
+```
+
+This emits per-sample worker RSS statistics from the running Kong pod and is intended to be used during streaming runs.
+
 #### Files added for the AI baseline
 
 - `deploy-k8s-resources/ai_upstream/server.js`
@@ -281,6 +406,27 @@ Once the default A1 baseline is working, useful next steps are:
 - `deploy-k8s-resources/k6_tests/run_ai_chat_baseline.sh`
 - `deploy-k8s-resources/k6_tests/extract_infra_metrics.sh`
 - `deploy-k8s-resources/kong_helm/ai-proxy-advanced-chat-baseline.yaml`
+
+#### Why the dedicated topology matters
+
+For basic bring-up, it is acceptable if Kong, k6, Redis, and observability land on the same large node. For serious performance work, that topology becomes noisy:
+
+- k6 can steal CPU and memory from Kong
+- Prometheus/Grafana/Redis add background resource pressure
+- mock upstream traffic can hide whether a bottleneck is in Kong or elsewhere
+
+The updated scheduling rules address this by making placement explicit:
+
+- **Kong** is pinned to the `kong` node role
+- **k6** initializer/starter/runner pods are pinned to the `loadgen` node role
+- **supporting services** are pinned to the `support` node role
+
+That separation works because the loadgen and kong node groups are tainted by role, the support node group is labeled for support workloads, and every benchmark workload is configured with matching `nodeSelector` + `tolerations` where needed. In practice, that gives us:
+
+- cleaner Kong CPU and memory measurements
+- less accidental node-local contention
+- more repeatable baselines across runs
+- a topology that scales better for longer-term AI Gateway perf work
 
 After triggering the k6 tests, you can check to see whether the k6 test is running by command like below:
 ```
