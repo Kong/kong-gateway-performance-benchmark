@@ -84,6 +84,44 @@ Default intended placement:
 
 This is intentional. It improves result quality because the load generator, the gateway under test, and supporting services stop competing for the same node's CPU and memory.
 
+### Topology diagram
+
+```mermaid
+flowchart LR
+  smoke[External smoke test\ncurl from laptop or shell]
+  elb[Kong ELB endpoint]
+
+  subgraph eks[EKS benchmark cluster]
+    direction LR
+
+    subgraph loadgen[loadgen node group\nc5.metal]
+      k6[k6 operator + runner pods]
+    end
+
+    subgraph kong[kong node group\nc5.4xlarge]
+      kongsvc[kong-kong-proxy.kong.svc.cluster.local]
+      kongdp[Kong DP / ingress controller pods]
+    end
+
+    subgraph support[support node group\nc5.2xlarge]
+      upstream[Mock upstream services\nClusterIP]
+      redis[Redis]
+      obs[Prometheus / Grafana / metrics-server]
+    end
+  end
+
+  smoke -->|manual validation| elb
+  elb -->|external smoke path| kongsvc
+  k6 -->|benchmark path\nin-cluster HTTPS| kongsvc
+  kongsvc --> kongdp
+  kongdp -->|proxy to ClusterIP| upstream
+  kongdp --> redis
+  obs -. metrics .-> kongdp
+  obs -. metrics .-> k6
+```
+
+**Traffic model note:** the benchmark path stays **inside the cluster**: k6 runner pods call Kong through the in-cluster `kong-kong-proxy.kong.svc.cluster.local` service, and Kong reaches the mock upstream through in-cluster `ClusterIP` services. The AWS ELB endpoint is still useful, but mainly for **external smoke tests and manual validation**.
+
 After pulling these topology changes:
 
 1. re-apply `provision-eks-cluster` so the node-group labels/taints and support node group exist
@@ -209,6 +247,8 @@ Expected response characteristics:
 - `usage.prompt_tokens`, `usage.completion_tokens`, and `usage.total_tokens` are present
 
 > Note: in some environments the Terraform output may print the ELB as `http://...`, but the actual Kong proxy path behaves as HTTPS-first. For smoke tests, prefer `https://...` with `--insecure`.
+
+> Note: this ELB endpoint is the **external smoke path**. The benchmark itself normally uses the **in-cluster path** (`https://kong-kong-proxy.kong.svc.cluster.local/...`) so load generation reaches Kong without adding extra load-balancer hops.
 
 #### 4. Run a small smoke test first
 
