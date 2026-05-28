@@ -1,0 +1,359 @@
+# Kong plugin and route configurations for advanced routing benchmarks.
+#
+# Covers:
+#   AIGW-PERF-101  Multi-model round-robin (2 / 10 / 50 targets)
+#   AIGW-PERF-102  Lowest-latency / EWMA routing
+#   AIGW-PERF-104  Failover (primary returns 5xx, fallback succeeds)
+#
+# All routes point to fake-provider in the upstream namespace.
+# Activate with:
+#   kubectl apply -f deploy-k8s-resources/kong_helm/ai-routing-benchmark.yaml
+
+# ---------------------------------------------------------------------------
+# AIGW-PERF-101a  Round-robin with 2 targets
+# ---------------------------------------------------------------------------
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-roundrobin-2
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  response_streaming: deny
+  max_request_body_size: 1048576
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    retries: 1
+    slots: 1000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+  targets:
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-gpt-4o-mini
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth:
+        allow_override: false
+      logging:
+        log_payloads: false
+        log_statistics: false
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-gpt-4o-mini-b
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth:
+        allow_override: false
+      logging:
+        log_payloads: false
+        log_statistics: false
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-roundrobin-2
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-roundrobin-2
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8080
+            path: /bench/routing/roundrobin/2
+            pathType: ImplementationSpecific
+---
+# ---------------------------------------------------------------------------
+# AIGW-PERF-101b  Round-robin with 10 targets
+# ---------------------------------------------------------------------------
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-roundrobin-10
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  response_streaming: deny
+  max_request_body_size: 1048576
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    retries: 1
+    slots: 1000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+  targets:
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-01
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-02
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-03
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-04
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-05
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-06
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-07
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-08
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-09
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-model-10
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-roundrobin-10
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-roundrobin-10
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8080
+            path: /bench/routing/roundrobin/10
+            pathType: ImplementationSpecific
+---
+# ---------------------------------------------------------------------------
+# AIGW-PERF-102  EWMA (lowest-latency) routing
+# Two targets with different artificial latencies so EWMA routing has a clear
+# preference to switch to: fast-mock at 50ms, slow-mock at 200ms.
+# ---------------------------------------------------------------------------
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-ewma
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  response_streaming: deny
+  max_request_body_size: 1048576
+  model_name_header: true
+  balancer:
+    algorithm: lowest-latency
+    retries: 1
+    slots: 1000
+    latency_strategy: tpot
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+  targets:
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-fast
+        # 50 ms TTFT via x-llm-ttft-ms header passed in k6 per-request
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-slow
+        # 200 ms TTFT — same upstream but the k6 script alternates the header
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-ewma
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-ewma
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8080
+            path: /bench/routing/ewma
+            pathType: ImplementationSpecific
+---
+# ---------------------------------------------------------------------------
+# AIGW-PERF-104  Failover
+# Primary mock returns 5xx; fallback mock succeeds.
+# fake-provider supports ?status=500 to simulate errors.
+# ---------------------------------------------------------------------------
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-benchmark-failover
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  response_streaming: deny
+  max_request_body_size: 1048576
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    retries: 2
+    slots: 1000
+    connect_timeout: 5000
+    read_timeout: 10000
+    write_timeout: 10000
+    failover_criteria:
+      - error
+      - timeout
+      - http_500
+      - http_502
+      - http_503
+      - http_504
+  targets:
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-primary-failing
+        # Returns 500 so Kong must fail over to mock-fallback
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions?status=500
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+    - route_type: llm/v1/chat
+      weight: 1
+      model:
+        provider: openai
+        name: mock-fallback
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+      auth: { allow_override: false }
+      logging: { log_payloads: false, log_statistics: false }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-failover
+  namespace: upstream
+  annotations:
+    konghq.com/plugins: ai-benchmark-failover
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8080
+            path: /bench/routing/failover
+            pathType: ImplementationSpecific

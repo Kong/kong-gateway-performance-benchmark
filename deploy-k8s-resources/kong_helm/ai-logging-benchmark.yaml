@@ -1,0 +1,59 @@
+# AIGW-PERF-006: Payload logging overhead benchmark
+#
+# Measures the latency and throughput impact of enabling log_payloads and
+# log_statistics on an ai-proxy-advanced route. Run k6_ai_token_chat.js
+# against the /bench/logging/chat/openai path (K6_AI_SCENARIO_NAME=payload-logging).
+#
+# Apply with:
+#   kubectl apply -f kong_helm/ai-logging-benchmark.yaml
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ai-proxy-advanced-payload-logging
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: ai-proxy-advanced
+config:
+  llm_format: openai
+  genai_category: text/generation
+  response_streaming: deny
+  max_request_body_size: 8388608
+  model_name_header: true
+  balancer:
+    algorithm: round-robin
+    tokens_count_strategy: total-tokens
+  targets:
+    - route_type: llm/v1/chat
+      weight: 100
+      model:
+        provider: openai
+        name: mock-gpt-4o-mini
+        options:
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8081/v1/chat/completions
+      auth:
+        allow_override: false
+      logging:
+        log_payloads: true
+        log_statistics: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-benchmark-payload-logging
+  namespace: upstream
+  annotations:
+    kubernetes.io/ingress.class: kong
+    konghq.com/plugins: ai-proxy-advanced-payload-logging
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /bench/logging/chat/openai
+            pathType: Prefix
+            backend:
+              service:
+                name: fake-provider
+                port:
+                  number: 8081

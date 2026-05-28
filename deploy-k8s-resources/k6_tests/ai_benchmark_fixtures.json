@@ -62,5 +62,57 @@
       "completion_tokens": 200,
       "expected_text": "wiremock-static-response"
     }
+  },
+  "large_prompt": {
+    "8kb": {
+      "prompt_tokens": 2048,
+      "completion_tokens": 256,
+      "ttft_ms": 150,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 32,
+      "label": "8kb"
+    },
+    "64kb": {
+      "prompt_tokens": 16384,
+      "completion_tokens": 256,
+      "ttft_ms": 200,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 32,
+      "label": "64kb"
+    },
+    "256kb": {
+      "prompt_tokens": 65536,
+      "completion_tokens": 256,
+      "ttft_ms": 300,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 32,
+      "label": "256kb"
+    }
+  },
+  "large_response": {
+    "64kb": {
+      "prompt_tokens": 64,
+      "completion_tokens": 16384,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 256,
+      "label": "64kb"
+    },
+    "512kb": {
+      "prompt_tokens": 64,
+      "completion_tokens": 131072,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 1024,
+      "label": "512kb"
+    },
+    "2mb": {
+      "prompt_tokens": 64,
+      "completion_tokens": 524288,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 2048,
+      "label": "2mb"
+    }
   }
 }

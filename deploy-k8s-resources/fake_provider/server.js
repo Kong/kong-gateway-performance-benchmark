@@ -355,6 +355,14 @@ async function handleOpenAiEmbeddings(req, res, body) {
 async function route(req, res) {
   const currentUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`)
 
+  // Allow callers to force a specific HTTP status code via ?status=NNN.
+  // Used by the failover benchmark to simulate a consistently-failing primary.
+  const forceStatus = Number(currentUrl.searchParams.get('status'))
+  if (Number.isInteger(forceStatus) && forceStatus >= 400 && forceStatus <= 599) {
+    sendJson(res, forceStatus, { error: `simulated ${forceStatus}` })
+    return
+  }
+
   if (req.method === 'GET' && currentUrl.pathname === '/healthz') {
     sendJson(res, 200, { status: 'ok' })
     return

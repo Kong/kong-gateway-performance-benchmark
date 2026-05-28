@@ -25,6 +25,13 @@ Scenarios:
   policy-token-budget  AI token budget overhead benchmark
   policy-cache-hit     Semantic cache hit benchmark
   policy-cache-miss    Semantic cache miss benchmark
+  large-prompt         Large prompt forwarding (AIGW-PERF-003): fixture=8kb|64kb|256kb
+  large-response       Large response body forwarding (AIGW-PERF-004): fixture=64kb|512kb|2mb
+  routing-roundrobin-2   Multi-model round-robin 2 targets (AIGW-PERF-101a)
+  routing-roundrobin-10  Multi-model round-robin 10 targets (AIGW-PERF-101b)
+  routing-ewma           EWMA lowest-latency routing (AIGW-PERF-102)
+  routing-failover       Failover scenario (AIGW-PERF-104)
+  payload-logging      Payload logging overhead (AIGW-PERF-006): reuses token-chat script
 
 Examples:
   ./run_ai_benchmark.sh token-chat-openai short 25 6m
@@ -172,6 +179,54 @@ case "$SCENARIO" in
     K6_AI_STREAM_VUS=25
     K6_AI_SCENARIO_NAME="policy-semantic-cache-miss"
     K6_AI_CACHE_MODE="miss"
+    LOAD_KIND="rps"
+    ;;
+  large-prompt)
+    SCRIPT_FILE="k6_ai_large_prompt.js"
+    K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/large/prompt"
+    K6_AI_RATE=${LOAD:-10}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=30
+    K6_AI_MAX_VUS=100
+    K6_AI_STREAM_VUS=10
+    K6_AI_SCENARIO_NAME="large-prompt"
+    LOAD_KIND="rps"
+    ;;
+  large-response)
+    SCRIPT_FILE="k6_ai_large_response.js"
+    K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/large/response"
+    K6_AI_RATE=${LOAD:-5}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=20
+    K6_AI_MAX_VUS=50
+    K6_AI_STREAM_VUS=5
+    K6_AI_SCENARIO_NAME="large-response"
+    LOAD_KIND="rps"
+    ;;
+  routing-roundrobin-2|routing-roundrobin-10|routing-ewma|routing-failover)
+    ROUTING_VARIANT="${SCENARIO#routing-}"
+    SCRIPT_FILE="k6_ai_routing.js"
+    K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/routing/${ROUTING_VARIANT}"
+    K6_AI_RATE=${LOAD:-25}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    K6_AI_STREAM_VUS=25
+    K6_AI_SCENARIO_NAME="routing-${ROUTING_VARIANT}"
+    LOAD_KIND="rps"
+    ;;
+  payload-logging)
+    # AIGW-PERF-006: reuses the token-chat script against a Kong route that
+    # has logging.log_payloads=true enabled. Apply kong_helm/ai-logging-benchmark.yaml
+    # before running this scenario.
+    SCRIPT_FILE="k6_ai_token_chat.js"
+    K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/logging/chat/openai"
+    K6_AI_RATE=${LOAD:-25}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    K6_AI_STREAM_VUS=25
+    K6_AI_SCENARIO_NAME="payload-logging"
     LOAD_KIND="rps"
     ;;
   *)
