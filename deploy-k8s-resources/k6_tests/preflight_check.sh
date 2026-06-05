@@ -117,7 +117,7 @@ case "$GATEWAY" in
   litellm)
     GATEWAY_NAMESPACE="litellm"
     GATEWAY_DEPLOYMENT="litellm-proxy"
-    GATEWAY_NODE_ROLE="gateway"
+    GATEWAY_NODE_ROLE="litellm"
     ;;
   *)
     log_error "Unknown gateway: $GATEWAY"

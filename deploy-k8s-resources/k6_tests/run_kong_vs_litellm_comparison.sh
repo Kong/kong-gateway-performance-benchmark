@@ -5,19 +5,26 @@
 # Run standardized benchmark scenarios against Kong AI Gateway and LiteLLM Proxy
 # to produce a side-by-side performance comparison report.
 #
-# Prerequisites:
-#   - Kong running on https://localhost:8443 with ai-proxy-advanced routes
-#   - LiteLLM running on http://localhost:4000
-#   - fake_provider running on 8080/8081
-#   - k6 installed locally
+# Supports both local Docker and EKS environments with proper isolation.
+#
+# Local Mode:
+#   - Kong on https://localhost:8443
+#   - LiteLLM on http://localhost:4000
+#   - No environment isolation (reference only)
+#
+# EKS Mode (--eks):
+#   - Kong on dedicated kong node group
+#   - LiteLLM on dedicated litellm node group
+#   - k6 on dedicated loadgen node group
+#   - Full environment isolation
 #
 # Usage:
 #   ./run_kong_vs_litellm_comparison.sh [scenario] [options]
 #
 # Examples:
-#   ./run_kong_vs_litellm_comparison.sh              # Run all scenarios
-#   ./run_kong_vs_litellm_comparison.sh token-chat   # Run specific scenario
-#   ./run_kong_vs_litellm_comparison.sh --quick      # Quick test (shorter duration)
+#   ./run_kong_vs_litellm_comparison.sh                    # Local, all scenarios
+#   ./run_kong_vs_litellm_comparison.sh --eks              # EKS, all scenarios
+#   ./run_kong_vs_litellm_comparison.sh token-chat --quick # Quick local test
 # =============================================================================
 
 set -euo pipefail
@@ -26,24 +33,29 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 RESULTS_DIR=${RESULTS_DIR:-"./results/comparison-$(date -u +"%Y%m%dT%H%M%SZ")"}
 
 # -----------------------------------------------------------------------------
-# Configuration
+# Environment Detection
 # -----------------------------------------------------------------------------
-# Kong Gateway
-KONG_PROXY_URL="https://localhost:8443"
-KONG_NAME="kong"
+EKS_MODE=${EKS_MODE:-false}
 
-# LiteLLM Proxy  
-LITELLM_PROXY_URL="http://localhost:4000"
-LITELLM_AUTH_TOKEN="sk-litellm-master-key"
-LITELLM_NAME="litellm"
+# Default URLs (local mode)
+KONG_PROXY_URL=${KONG_PROXY_URL:-"https://localhost:8443"}
+LITELLM_PROXY_URL=${LITELLM_PROXY_URL:-"http://localhost:4000"}
+
+# EKS URLs (will be set if --eks flag is used)
+KONG_EKS_URL="https://kong-kong-proxy.kong.svc.cluster.local"
+LITELLM_EKS_URL="http://litellm-proxy.litellm.svc.cluster.local:4000"
+
+# LiteLLM auth token
+LITELLM_AUTH_TOKEN=${LITELLM_AUTH_TOKEN:-"sk-litellm-master-key"}
 
 # Test Parameters
 DURATION=${DURATION:-"30s"}
 QUICK_DURATION="15s"
 REPEATS=${REPEATS:-1}
 
-# Prometheus
-PROMETHEUS_URL="http://localhost:9090/api/v1/write"
+# Prometheus (local vs EKS)
+PROMETHEUS_URL=${PROMETHEUS_URL:-"http://localhost:9090/api/v1/write"}
+PROMETHEUS_EKS_URL="http://prometheus-server.observability.svc.cluster.local:9090/api/v1/write"
 
 # -----------------------------------------------------------------------------
 # Scenario Definitions
@@ -334,6 +346,7 @@ Scenarios:
   policy-auth         Authentication overhead
 
 Options:
+  --eks               Run in EKS mode with full environment isolation
   --quick             Use shorter test duration (15s)
   --repeats N         Number of repeats per load point (default: 1)
   --duration D        Test duration (default: 30s)
@@ -342,17 +355,83 @@ Options:
   --help, -h          Show this help
 
 Environment Variables:
+  EKS_MODE            Set to 'true' for EKS mode (alternative to --eks)
   KONG_PROXY_URL      Kong proxy URL (default: https://localhost:8443)
   LITELLM_PROXY_URL   LiteLLM proxy URL (default: http://localhost:4000)
   LITELLM_AUTH_TOKEN  LiteLLM auth token (default: sk-litellm-master-key)
 
 Examples:
-  ./run_kong_vs_litellm_comparison.sh                    # Run all scenarios
+  ./run_kong_vs_litellm_comparison.sh                    # Local, all scenarios
+  ./run_kong_vs_litellm_comparison.sh --eks              # EKS, all scenarios
   ./run_kong_vs_litellm_comparison.sh token-chat-openai  # Single scenario
   ./run_kong_vs_litellm_comparison.sh --quick            # Quick test
-  ./run_kong_vs_litellm_comparison.sh stream-openai --repeats 3
+  ./run_kong_vs_litellm_comparison.sh --eks --repeats 3  # EKS with 3 repeats
+
+EKS Mode Requirements:
+  - EKS cluster with litellm node group enabled
+  - kubectl configured to access the cluster
+  - Kong deployed in 'kong' namespace on kong nodes
+  - LiteLLM deployed in 'litellm' namespace on litellm nodes
+  - k6 operator deployed in 'k6' namespace on loadgen nodes
 EOF
   exit 0
+}
+
+# -----------------------------------------------------------------------------
+# EKS Preflight Check
+# -----------------------------------------------------------------------------
+run_eks_preflight() {
+  log_info "Running EKS preflight checks..."
+  
+  # Check kubectl access
+  if ! kubectl cluster-info &>/dev/null; then
+    log_error "Cannot access Kubernetes cluster. Check your kubeconfig."
+    exit 1
+  fi
+  log_ok "kubectl access verified"
+  
+  # Check Kong deployment
+  local kong_ready
+  kong_ready=$(kubectl get deployment -n kong kong-kong -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+  if [[ "$kong_ready" -eq 0 ]]; then
+    log_error "Kong deployment not ready in 'kong' namespace"
+    exit 1
+  fi
+  log_ok "Kong deployment ready ($kong_ready replicas)"
+  
+  # Check LiteLLM deployment
+  local litellm_ready
+  litellm_ready=$(kubectl get deployment -n litellm litellm-proxy -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+  if [[ "$litellm_ready" -eq 0 ]]; then
+    log_error "LiteLLM deployment not ready in 'litellm' namespace"
+    log_info "Deploy LiteLLM: kubectl apply -f deploy-k8s-resources/kong_helm/litellm-deployment.yaml"
+    exit 1
+  fi
+  log_ok "LiteLLM deployment ready ($litellm_ready replicas)"
+  
+  # Check node isolation
+  local kong_node litellm_node
+  kong_node=$(kubectl get nodes -l benchmark.konghq.com/node-role=kong -o name 2>/dev/null | head -1)
+  litellm_node=$(kubectl get nodes -l benchmark.konghq.com/node-role=litellm -o name 2>/dev/null | head -1)
+  
+  if [[ -z "$kong_node" ]]; then
+    log_warn "No dedicated Kong node found"
+  else
+    log_ok "Kong node: $kong_node"
+  fi
+  
+  if [[ -z "$litellm_node" ]]; then
+    log_warn "No dedicated LiteLLM node found"
+  else
+    log_ok "LiteLLM node: $litellm_node"
+  fi
+  
+  if [[ "$kong_node" == "$litellm_node" ]]; then
+    log_warn "Kong and LiteLLM are on the same node - isolation not guaranteed!"
+  fi
+  
+  log_ok "EKS preflight checks passed"
+  echo ""
 }
 
 # -----------------------------------------------------------------------------
@@ -365,6 +444,13 @@ main() {
   # Parse arguments
   while [[ $# -gt 0 ]]; do
     case $1 in
+      --eks)
+        EKS_MODE=true
+        KONG_PROXY_URL="$KONG_EKS_URL"
+        LITELLM_PROXY_URL="$LITELLM_EKS_URL"
+        PROMETHEUS_URL="$PROMETHEUS_EKS_URL"
+        shift
+        ;;
       --quick)
         DURATION="$QUICK_DURATION"
         shift
@@ -412,15 +498,32 @@ main() {
     # scenarios_to_run=("${!SCENARIOS[@]}")
   fi
   
+  local env_mode="LOCAL (reference only)"
+  if [[ "$EKS_MODE" == "true" ]]; then
+    env_mode="EKS (isolated)"
+  fi
+  
   echo "=============================================="
   echo "  Kong vs LiteLLM Performance Comparison"
   echo "=============================================="
+  echo "  Environment: $env_mode"
+  echo "  Kong URL: $KONG_PROXY_URL"
+  echo "  LiteLLM URL: $LITELLM_PROXY_URL"
   echo "  Scenarios: ${scenarios_to_run[*]}"
   echo "  Duration: $DURATION"
   echo "  Repeats: $REPEATS"
   echo "  Results: $RESULTS_DIR"
   echo "=============================================="
   echo ""
+  
+  # Run EKS preflight checks if in EKS mode
+  if [[ "$EKS_MODE" == "true" ]]; then
+    run_eks_preflight
+  else
+    log_warn "Running in LOCAL mode - results are for reference only"
+    log_warn "For production-grade comparison, use --eks flag with isolated EKS environment"
+    echo ""
+  fi
   
   mkdir -p "$RESULTS_DIR"
   echo "gateway,scenario,load,p95_ms,p99_ms,error_rate,rps,ttft_p95" > "$RESULTS_DIR/all_results.csv"

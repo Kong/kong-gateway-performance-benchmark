@@ -13,57 +13,9 @@ data "aws_availability_zones" "available" {
 
 locals {
   cluster_name = "${var.cluster_name}-${random_string.suffix.result}"
-}
-
-resource "random_string" "suffix" {
-  length  = 8
-  special = false
-}
-
-module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "5.0.0"
-
-  name = local.cluster_name
-
-  cidr = "10.0.0.0/16"
-  azs  = slice(data.aws_availability_zones.available.names, 0, 3)
-
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets  = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
-
-  enable_nat_gateway   = true
-  single_nat_gateway   = true
-  enable_dns_hostnames = true
-
-  public_subnet_tags = {
-    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
-    "kubernetes.io/role/elb"                      = 1
-  }
-
-  private_subnet_tags = {
-    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
-    "kubernetes.io/role/internal-elb"             = 1
-  }
-}
-
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "19.15.3"
-
-  cluster_name    = local.cluster_name
-  cluster_version = var.cluster_version
-
-  vpc_id                         = module.vpc.vpc_id
-  subnet_ids                     = module.vpc.private_subnets
-  cluster_endpoint_public_access = true
-
-  eks_managed_node_group_defaults = {
-    ami_type = "AL2_x86_64"
-
-  }
-  # TODO: rename node groups, kong-perf-node-group-n
-  eks_managed_node_groups = {
+  
+  # Base node groups (always present)
+  base_node_groups = {
     one = {
       name = "node-group-1"
 
@@ -122,6 +74,85 @@ module "eks" {
       }
     }
   }
+  
+  # LiteLLM node group (optional, for gateway comparison benchmarks)
+  litellm_node_group = var.enable_litellm_node_group ? {
+    litellm = {
+      name = "node-group-litellm"
+
+      instance_types = [var.instance_type_litellm]
+
+      min_size     = 1
+      max_size     = 2
+      desired_size = 1
+
+      labels = {
+        "benchmark.konghq.com/node-role" = "litellm"
+      }
+
+      taints = {
+        dedicated = {
+          key    = "dedicated"
+          value  = "litellm"
+          effect = "NO_SCHEDULE"
+        }
+      }
+    }
+  } : {}
+  
+  # Merged node groups
+  eks_managed_node_groups = merge(local.base_node_groups, local.litellm_node_group)
+}
+
+resource "random_string" "suffix" {
+  length  = 8
+  special = false
+}
+
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "5.0.0"
+
+  name = local.cluster_name
+
+  cidr = "10.0.0.0/16"
+  azs  = slice(data.aws_availability_zones.available.names, 0, 3)
+
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
+  enable_dns_hostnames = true
+
+  public_subnet_tags = {
+    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
+    "kubernetes.io/role/elb"                      = 1
+  }
+
+  private_subnet_tags = {
+    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
+    "kubernetes.io/role/internal-elb"             = 1
+  }
+}
+
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "19.15.3"
+
+  cluster_name    = local.cluster_name
+  cluster_version = var.cluster_version
+
+  vpc_id                         = module.vpc.vpc_id
+  subnet_ids                     = module.vpc.private_subnets
+  cluster_endpoint_public_access = true
+
+  eks_managed_node_group_defaults = {
+    ami_type = "AL2_x86_64"
+  }
+
+  # Node groups defined in locals for conditional LiteLLM support
+  eks_managed_node_groups = local.eks_managed_node_groups
 }
 
 

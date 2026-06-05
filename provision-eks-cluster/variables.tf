@@ -39,3 +39,15 @@ variable "instance_type_support" {
   type        = string
   default     = "c5.2xlarge"
 }
+
+variable "instance_type_litellm" {
+  description = "EKS node instance type for LiteLLM proxy (should match Kong for fair comparison)"
+  type        = string
+  default     = "c5.4xlarge"
+}
+
+variable "enable_litellm_node_group" {
+  description = "Whether to create a dedicated LiteLLM node group for gateway comparison benchmarks"
+  type        = bool
+  default     = false
+}

@@ -34,3 +34,6 @@ terraform.rc
 # Kong Enterprise License (sensitive)
 license.json
 **/license.json
+
+# Benchmark results (generated)
+**/results/

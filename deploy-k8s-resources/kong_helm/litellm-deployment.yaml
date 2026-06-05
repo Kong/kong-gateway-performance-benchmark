@@ -1,0 +1,184 @@
+---
+# =============================================================================
+# LiteLLM Proxy Deployment for EKS Benchmark Environment
+# =============================================================================
+# Deploy LiteLLM Proxy on dedicated node group for fair gateway comparison.
+#
+# Prerequisites:
+#   - EKS cluster with litellm node group enabled
+#   - fake_provider mock running in upstream namespace
+#
+# Usage:
+#   kubectl apply -f litellm-deployment.yaml
+# =============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: litellm
+  labels:
+    app: litellm
+    benchmark.konghq.com/component: gateway
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: litellm
+data:
+  config.yaml: |
+    model_list:
+      # Mock chat models - routes to fake_provider in upstream namespace
+      - model_name: mock-gpt-4o-mini
+        litellm_params:
+          model: openai/mock-gpt-4o-mini
+          api_base: http://fake-provider.upstream.svc.cluster.local:8081/v1
+          api_key: fake-key
+          
+      - model_name: mock-gemini-2.5-flash
+        litellm_params:
+          model: openai/mock-gemini-2.5-flash
+          api_base: http://fake-provider.upstream.svc.cluster.local:8081/v1
+          api_key: fake-key
+
+      # Mock embedding model
+      - model_name: text-embedding-3-small
+        litellm_params:
+          model: openai/text-embedding-3-small
+          api_base: http://fake-provider.upstream.svc.cluster.local:8081/v1
+          api_key: fake-key
+
+      # Large payload model
+      - model_name: mock-large-context
+        litellm_params:
+          model: openai/mock-gpt-4o-mini
+          api_base: http://fake-provider.upstream.svc.cluster.local:8081/v1
+          api_key: fake-key
+
+    litellm_settings:
+      set_verbose: false
+      json_logs: true
+      request_timeout: 60
+      num_retries: 0
+
+    general_settings:
+      master_key: sk-litellm-master-key
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm-proxy
+  namespace: litellm
+  labels:
+    app: litellm-proxy
+    benchmark.konghq.com/component: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litellm-proxy
+  template:
+    metadata:
+      labels:
+        app: litellm-proxy
+        benchmark.konghq.com/component: gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Schedule on dedicated litellm nodes for isolation
+      nodeSelector:
+        benchmark.konghq.com/node-role: litellm
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: litellm
+          effect: NoSchedule
+      
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-latest
+          args:
+            - --config
+            - /app/config.yaml
+            - --port
+            - "4000"
+          ports:
+            - containerPort: 4000
+              name: http
+              protocol: TCP
+          env:
+            - name: LITELLM_MASTER_KEY
+              value: sk-litellm-master-key
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm-proxy
+  namespace: litellm
+  labels:
+    app: litellm-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: litellm-proxy
+  ports:
+    - name: http
+      port: 4000
+      targetPort: 4000
+      protocol: TCP
+
+---
+# LoadBalancer service for external access (optional)
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm-proxy-lb
+  namespace: litellm
+  labels:
+    app: litellm-proxy
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+spec:
+  type: LoadBalancer
+  selector:
+    app: litellm-proxy
+  ports:
+    - name: http
+      port: 4000
+      targetPort: 4000
+      protocol: TCP
