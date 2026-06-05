@@ -32,6 +32,30 @@ services:
       - prometheus
     restart: unless-stopped
 
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: local-litellm
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    command:
+      - --config
+      - /app/config.yaml
+      - --port
+      - "4000"
+      - --detailed_debug
+    environment:
+      - LITELLM_MASTER_KEY=sk-litellm-master-key
+      # Uncomment and set real API keys if needed
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    restart: unless-stopped
+    # Note: LiteLLM needs to access fake_provider on host
+    # Use host.docker.internal on Mac/Windows, or 172.19.0.1 on Linux
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   prometheus-data:
   grafana-data:

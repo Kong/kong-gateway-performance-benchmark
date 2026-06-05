@@ -1,0 +1,66 @@
+# LiteLLM Proxy Configuration
+# Docs: https://docs.litellm.ai/docs/proxy/configs
+
+model_list:
+  # Mock chat models - routes to local fake_provider
+  - model_name: mock-gpt-4o-mini
+    litellm_params:
+      model: openai/mock-gpt-4o-mini
+      api_base: http://172.19.0.1:8081/v1
+      api_key: fake-key
+      
+  - model_name: mock-gemini-2.5-flash
+    litellm_params:
+      model: openai/mock-gemini-2.5-flash
+      api_base: http://172.19.0.1:8081/v1
+      api_key: fake-key
+
+  # Mock embedding model
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_base: http://172.19.0.1:8081/v1
+      api_key: fake-key
+
+  # Large payload model (same mock, just alias)
+  - model_name: mock-large-context
+    litellm_params:
+      model: openai/mock-gpt-4o-mini
+      api_base: http://172.19.0.1:8081/v1
+      api_key: fake-key
+
+  # Uncomment below to add real providers
+  # - model_name: gpt-4o-mini
+  #   litellm_params:
+  #     model: gpt-4o-mini
+  #     api_key: os.environ/OPENAI_API_KEY
+
+  # - model_name: claude-3-haiku
+  #   litellm_params:
+  #     model: claude-3-haiku-20240307
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+
+litellm_settings:
+  # Enable request/response logging
+  set_verbose: false
+  json_logs: true
+  
+  # Request timeout
+  request_timeout: 60
+  
+  # Max retries
+  num_retries: 0
+  
+  # Enable caching (optional)
+  # cache: true
+  # cache_params:
+  #   type: redis
+  #   host: localhost
+  #   port: 6379
+
+general_settings:
+  # Master key for admin access
+  master_key: sk-litellm-master-key
+  
+  # Database for tracking (optional)
+  # database_url: postgresql://user:pass@localhost:5432/litellm
