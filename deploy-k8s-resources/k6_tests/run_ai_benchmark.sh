@@ -50,6 +50,54 @@ if ! command -v yq >/dev/null 2>&1; then
   exit 1
 fi
 
+require_node_role() {
+  local role=$1
+  local count
+  count=$(kubectl get nodes -l "benchmark.konghq.com/node-role=${role}" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "${count}" -eq 0 ]]; then
+    echo "Error: missing node role '${role}'. Expected labeled nodes for EKS isolation."
+    return 1
+  fi
+}
+
+require_deployment_role() {
+  local namespace=$1
+  local deployment=$2
+  local expected_role=$3
+  local actual_role
+
+  actual_role=$(kubectl get deploy -n "${namespace}" "${deployment}" -o jsonpath='{.spec.template.spec.nodeSelector.benchmark\.konghq\.com/node-role}' 2>/dev/null || true)
+  if [[ -z "${actual_role}" ]]; then
+    echo "Error: cannot read nodeSelector role from deployment '${deployment}' in namespace '${namespace}'."
+    return 1
+  fi
+
+  if [[ "${actual_role}" != "${expected_role}" ]]; then
+    echo "Error: deployment '${deployment}' in namespace '${namespace}' is on role '${actual_role}', expected '${expected_role}'."
+    return 1
+  fi
+}
+
+enforce_eks_isolation() {
+  if [[ "${SKIP_EKS_ISOLATION_CHECK:-false}" == "true" ]]; then
+    echo "Warning: skipping EKS isolation checks because SKIP_EKS_ISOLATION_CHECK=true"
+    return 0
+  fi
+
+  echo "Checking EKS isolation prerequisites..."
+
+  require_node_role "loadgen"
+  require_node_role "kong"
+  require_node_role "support"
+
+  require_deployment_role "kong" "kong-kong" "kong"
+  require_deployment_role "upstream" "fake-provider" "support"
+
+  echo "EKS isolation check passed (loadgen/kong/support)."
+}
+
+enforce_eks_isolation
+
 SCENARIO=$1
 FIXTURE=${2:-short}
 LOAD=${3:-}

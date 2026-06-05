@@ -34,6 +34,34 @@ VU_POINTS=(${STREAM_OPENAI_VUS:-25 50 100 200 400})
 INFRA_INTERVAL_SECONDS=${INFRA_INTERVAL_SECONDS:-10}
 RSS_INTERVAL_SECONDS=${RSS_INTERVAL_SECONDS:-5}
 
+# Gate evaluation settings
+GATEWAY=${GATEWAY:-kong}
+SKIP_PREFLIGHT=${SKIP_PREFLIGHT:-false}
+SKIP_GATE_EVALUATION=${SKIP_GATE_EVALUATION:-false}
+STRICT_GATES=${STRICT_GATES:-true}
+
+# -----------------------------------------------------------------------------
+# Preflight Check
+# -----------------------------------------------------------------------------
+run_preflight_check() {
+  if [[ "$SKIP_PREFLIGHT" == "true" ]]; then
+    echo -e "\e[93m[WARN] Skipping preflight check (SKIP_PREFLIGHT=true)\e[0m"
+    return 0
+  fi
+
+  echo "Running environment preflight check..."
+  if [[ -f "$SCRIPT_DIR/preflight_check.sh" ]]; then
+    if ! bash "$SCRIPT_DIR/preflight_check.sh" --gateway "$GATEWAY"; then
+      echo -e "\e[91m[ERROR] Preflight check failed. Fix issues or set SKIP_PREFLIGHT=true to bypass.\e[0m"
+      exit 1
+    fi
+  else
+    echo -e "\e[93m[WARN] preflight_check.sh not found, skipping\e[0m"
+  fi
+}
+
+run_preflight_check
+
 duration_to_seconds() {
   local raw=${1:-0}
   local amount unit
@@ -398,3 +426,68 @@ echo "Results directory: $RESULTS_DIR"
 echo "Per-run summary: $SUMMARY_FILE"
 echo "Aggregated summary: $AGGREGATE_FILE"
 echo "Findings: $FINDINGS_FILE"
+
+# -----------------------------------------------------------------------------
+# Gate Evaluation
+# -----------------------------------------------------------------------------
+EVALUATION_FILE="$RESULTS_DIR/evaluation.json"
+EVALUATION_MD="$RESULTS_DIR/evaluation.md"
+EXIT_CODE=0
+
+if [[ "$SKIP_GATE_EVALUATION" == "true" ]]; then
+  echo -e "\e[93m[WARN] Skipping gate evaluation (SKIP_GATE_EVALUATION=true)\e[0m"
+else
+  echo ""
+  echo "Running gate evaluation against SLOs..."
+  
+  if [[ -f "$SCRIPT_DIR/evaluate_benchmark_results.py" ]]; then
+    # Generate JSON evaluation
+    python3 "$SCRIPT_DIR/evaluate_benchmark_results.py" \
+      "$SUMMARY_FILE" \
+      --scenario "$SCENARIO" \
+      --gateway "$GATEWAY" \
+      --config "$SCRIPT_DIR/benchmark_config.yaml" \
+      --output json > "$EVALUATION_FILE" 2>&1 || true
+    
+    # Generate Markdown report
+    python3 "$SCRIPT_DIR/evaluate_benchmark_results.py" \
+      "$SUMMARY_FILE" \
+      --scenario "$SCENARIO" \
+      --gateway "$GATEWAY" \
+      --config "$SCRIPT_DIR/benchmark_config.yaml" \
+      --output markdown > "$EVALUATION_MD" 2>&1 || true
+    
+    # Determine exit code
+    if [[ "$STRICT_GATES" == "true" ]]; then
+      python3 "$SCRIPT_DIR/evaluate_benchmark_results.py" \
+        "$SUMMARY_FILE" \
+        --scenario "$SCENARIO" \
+        --gateway "$GATEWAY" \
+        --config "$SCRIPT_DIR/benchmark_config.yaml" \
+        --strict
+      EXIT_CODE=$?
+    else
+      python3 "$SCRIPT_DIR/evaluate_benchmark_results.py" \
+        "$SUMMARY_FILE" \
+        --scenario "$SCENARIO" \
+        --gateway "$GATEWAY" \
+        --config "$SCRIPT_DIR/benchmark_config.yaml"
+      EXIT_CODE=$?
+    fi
+    
+    echo "Evaluation JSON: $EVALUATION_FILE"
+    echo "Evaluation Report: $EVALUATION_MD"
+    
+    if [[ $EXIT_CODE -eq 0 ]]; then
+      echo -e "\e[92m[GATE PASSED] All SLOs met\e[0m"
+    elif [[ $EXIT_CODE -eq 2 ]]; then
+      echo -e "\e[93m[GATE WARNING] SLOs met but with warnings\e[0m"
+    else
+      echo -e "\e[91m[GATE FAILED] SLO violations detected\e[0m"
+    fi
+  else
+    echo -e "\e[93m[WARN] evaluate_benchmark_results.py not found, skipping gate evaluation\e[0m"
+  fi
+fi
+
+exit $EXIT_CODE

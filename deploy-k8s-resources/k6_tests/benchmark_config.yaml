@@ -1,0 +1,219 @@
+# =============================================================================
+# Kong AI Gateway Performance Benchmark — Unified Configuration
+# =============================================================================
+# This file defines SLOs, thresholds, and gate rules for production-grade
+# benchmark runs. All campaign scripts source this config for consistent
+# pass/fail determination.
+#
+# Future: Add sections for LiteLLM, Envoy AI Gateway, etc. to enable
+# apples-to-apples comparisons.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Global Settings
+# -----------------------------------------------------------------------------
+global:
+  # Minimum number of repeats required for statistical validity
+  min_repeats: 3
+  
+  # Maximum coefficient of variation (CV) for key metrics before flagging
+  # instability. CV = stddev / mean × 100. Values above this suggest
+  # environmental noise or inconsistent behavior.
+  max_coefficient_of_variation_percent: 15.0
+  
+  # Warmup and steady-state windows (future: k6 scenarios will respect these)
+  warmup_duration: 30s
+  steady_state_duration: 5m
+  cooldown_duration: 30s
+
+# -----------------------------------------------------------------------------
+# Service Level Objectives (SLOs) — Hard Gates
+# -----------------------------------------------------------------------------
+# If ANY of these are violated, the benchmark run is marked FAILED.
+# These represent minimum acceptable production quality.
+slo:
+  # Maximum acceptable error rate (http_req_failed)
+  max_error_rate_percent: 1.0
+  
+  # Minimum acceptable checks pass rate
+  min_checks_pass_rate_percent: 99.0
+  
+  # Maximum p95 latency in milliseconds (scenario-specific overrides below)
+  max_p95_latency_ms: 500
+  
+  # Maximum p99 latency in milliseconds
+  max_p99_latency_ms: 1000
+  
+  # Maximum dropped iterations rate (indicates load generator saturation)
+  max_dropped_iterations_rate_percent: 5.0
+
+# -----------------------------------------------------------------------------
+# Scenario-Specific Overrides
+# -----------------------------------------------------------------------------
+# Different scenarios have different latency expectations.
+scenarios:
+  token-chat-openai:
+    max_p95_latency_ms: 300
+    max_p99_latency_ms: 600
+    description: "Non-streaming chat, short fixture, baseline scenario"
+  
+  stream-openai:
+    max_p95_latency_ms: 500
+    max_p99_latency_ms: 1200
+    # Streaming scenarios measure TTFT, not total duration
+    max_ttft_p95_ms: 200
+    description: "Streaming chat with SSE, measures time-to-first-token"
+  
+  stream-gemini:
+    max_p95_latency_ms: 500
+    max_p99_latency_ms: 1200
+    max_ttft_p95_ms: 200
+    description: "Gemini-format streaming chat"
+  
+  embeddings-openai:
+    max_p95_latency_ms: 200
+    max_p99_latency_ms: 400
+    description: "Embeddings endpoint, typically lower latency"
+  
+  large-prompt:
+    max_p95_latency_ms: 800
+    max_p99_latency_ms: 1500
+    description: "Large prompt forwarding (8kb-256kb)"
+  
+  large-response:
+    max_p95_latency_ms: 1000
+    max_p99_latency_ms: 2000
+    description: "Large response body forwarding (64kb-2mb)"
+  
+  routing-roundrobin-2:
+    max_p95_latency_ms: 350
+    max_p99_latency_ms: 700
+    description: "Round-robin across 2 targets"
+  
+  routing-roundrobin-10:
+    max_p95_latency_ms: 400
+    max_p99_latency_ms: 800
+    description: "Round-robin across 10 targets"
+  
+  routing-ewma:
+    max_p95_latency_ms: 350
+    max_p99_latency_ms: 700
+    description: "EWMA lowest-latency routing"
+  
+  routing-failover:
+    max_p95_latency_ms: 600
+    max_p99_latency_ms: 1200
+    description: "Failover scenario with retry overhead"
+  
+  payload-logging:
+    max_p95_latency_ms: 400
+    max_p99_latency_ms: 800
+    description: "Payload logging overhead measurement"
+  
+  policy-auth-openai:
+    max_p95_latency_ms: 350
+    max_p99_latency_ms: 700
+    description: "Key-auth policy overhead"
+  
+  policy-rate-limit:
+    max_p95_latency_ms: 350
+    max_p99_latency_ms: 700
+    description: "Rate limiting policy overhead"
+  
+  policy-cache-hit:
+    max_p95_latency_ms: 100
+    max_p99_latency_ms: 200
+    description: "Semantic cache hit — should be very fast"
+  
+  policy-cache-miss:
+    max_p95_latency_ms: 400
+    max_p99_latency_ms: 800
+    description: "Semantic cache miss — full upstream round-trip"
+
+# -----------------------------------------------------------------------------
+# Infrastructure Capacity Thresholds
+# -----------------------------------------------------------------------------
+# Warning thresholds for resource utilization. Exceeding these suggests
+# the component may be a bottleneck.
+infra:
+  # Pod-level utilization warnings (percent of limit)
+  pod_cpu_warning_percent: 80
+  pod_memory_warning_percent: 85
+  
+  # Node-level utilization warnings (percent of allocatable)
+  node_cpu_warning_percent: 75
+  node_memory_warning_percent: 80
+  
+  # Kong worker RSS growth warning (KB increase during test)
+  kong_worker_rss_growth_warning_kb: 102400  # 100MB
+
+# -----------------------------------------------------------------------------
+# Gateway Profiles (Multi-Gateway Comparison Support)
+# -----------------------------------------------------------------------------
+# Each gateway has its own deployment, endpoints, and expected behavior.
+# This enables apples-to-apples comparison between Kong, LiteLLM, etc.
+gateways:
+  kong:
+    name: "Kong AI Gateway"
+    version_env: "KONG_VERSION"
+    proxy_service: "kong-kong-proxy.kong.svc.cluster.local"
+    proxy_port: 443
+    protocol: "https"
+    admin_service: "kong-kong-admin.kong.svc.cluster.local"
+    admin_port: 8001
+    namespace: "kong"
+    deployment: "kong-kong"
+    node_role: "kong"
+    metrics:
+      worker_rss_command: "ps -eo pid,rss,comm,args | grep 'nginx: worker process'"
+    tags:
+      vendor: "konghq"
+      product: "kong-gateway-enterprise"
+  
+  litellm:
+    name: "LiteLLM Proxy"
+    version_env: "LITELLM_VERSION"
+    proxy_service: "litellm-proxy.litellm.svc.cluster.local"
+    proxy_port: 4000
+    protocol: "http"
+    admin_service: "litellm-proxy.litellm.svc.cluster.local"
+    admin_port: 4000
+    namespace: "litellm"
+    deployment: "litellm-proxy"
+    node_role: "gateway"  # Would need separate node group or share with kong
+    metrics:
+      # LiteLLM is Python-based, different memory profiling
+      worker_rss_command: "ps -eo pid,rss,comm,args | grep 'python'"
+    tags:
+      vendor: "berriai"
+      product: "litellm"
+    # LiteLLM-specific route patterns (differs from Kong)
+    route_patterns:
+      chat: "/chat/completions"
+      embeddings: "/embeddings"
+      # LiteLLM uses OpenAI-compatible paths directly
+
+# -----------------------------------------------------------------------------
+# Comparison Test Matrix
+# -----------------------------------------------------------------------------
+# When running gateway comparisons, test these scenarios against all gateways.
+comparison:
+  enabled: false
+  gateways:
+    - kong
+    - litellm
+  scenarios:
+    - token-chat-openai
+    - stream-openai
+    - embeddings-openai
+    - large-prompt
+    - large-response
+  fixtures:
+    - short
+    - medium
+  load_points:
+    - 25
+    - 50
+    - 100
+    - 200
+  repeats: 3

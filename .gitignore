@@ -31,3 +31,6 @@ terraform.rc
 *.lock.hcl
 
 **/k6-test-temp.yaml
+# Kong Enterprise License (sensitive)
+license.json
+**/license.json
