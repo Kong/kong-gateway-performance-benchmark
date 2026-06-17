@@ -1,0 +1,7 @@
+AI benchmark summary: stream gemini (short)
+http_reqs/s: 22.64
+http_req_duration p95(ms): 1326.21318745
+http_req_duration p99(ms): 1327.9283523200002
+http_req_failed(%): 0.00
+checks pass rate(%): 100.00
+ai_time_to_first_token_ms p95: 123.0886265

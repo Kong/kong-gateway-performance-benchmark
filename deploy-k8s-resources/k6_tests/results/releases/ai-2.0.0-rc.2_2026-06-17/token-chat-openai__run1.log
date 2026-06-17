@@ -1,0 +1,6 @@
+AI benchmark summary: token chat openai (short)
+http_reqs/s: 49.83
+http_req_duration p95(ms): 614.4819109499999
+http_req_duration p99(ms): 614.76909112
+http_req_failed(%): 0.00
+checks pass rate(%): 100.00
