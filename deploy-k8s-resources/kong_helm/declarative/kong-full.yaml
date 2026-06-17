@@ -1,0 +1,485 @@
+_format_version: '3.0'
+services:
+- name: ai-benchmark-static-chat
+  url: http://static-openai-mock.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-static-chat
+    paths:
+    - /bench/static/chat
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        response_streaming: deny
+        max_request_body_size: 1048576
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          retries: 1
+          slots: 1000
+          connect_timeout: 60000
+          read_timeout: 60000
+          write_timeout: 60000
+        targets:
+        - route_type: llm/v1/chat
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+            name: wiremock-static-chat
+            options:
+              upstream_url: http://static-openai-mock.upstream.svc.cluster.local:8080/v1/chat/completions
+- name: ai-benchmark-token-chat-openai
+  url: http://fake-provider.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-token-chat-openai
+    paths:
+    - /bench/token/chat/openai
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        response_streaming: allow
+        max_request_body_size: 10485760
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          retries: 1
+          slots: 1000
+          connect_timeout: 60000
+          read_timeout: 60000
+          write_timeout: 60000
+        targets:
+        - route_type: llm/v1/chat
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+            name: mock-gpt-4o-mini
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+- name: ai-benchmark-token-stream-openai
+  url: http://fake-provider.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-token-stream-openai
+    paths:
+    - /bench/token/stream/openai
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        response_streaming: allow
+        max_request_body_size: 10485760
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          retries: 1
+          slots: 1000
+          connect_timeout: 60000
+          read_timeout: 60000
+          write_timeout: 60000
+        targets:
+        - route_type: llm/v1/chat
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+            name: mock-gpt-4o-mini
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+- name: ai-benchmark-token-stream-gemini
+  url: http://fake-provider.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-token-stream-gemini
+    paths:
+    - /bench/token/stream/gemini/models/mock-gemini-2.5-flash:streamGenerateContent
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: gemini
+        response_streaming: always
+        max_request_body_size: 10485760
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          retries: 1
+          slots: 1000
+          connect_timeout: 60000
+          read_timeout: 60000
+          write_timeout: 60000
+        targets:
+        - route_type: llm/v1/chat
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: gemini
+            name: mock-gemini-2.5-flash
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080
+- name: ai-benchmark-token-embeddings-openai
+  url: http://fake-provider.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-token-embeddings-openai
+    paths:
+    - /bench/token/embeddings/openai
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        genai_category: text/embeddings
+        response_streaming: deny
+        max_request_body_size: 10485760
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          retries: 1
+          slots: 1000
+          connect_timeout: 60000
+          read_timeout: 60000
+          write_timeout: 60000
+        targets:
+        - route_type: llm/v1/embeddings
+          logging:
+            log_payloads: false
+            log_statistics: true
+          model:
+            provider: openai
+            name: text-embedding-3-small
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/embeddings
+- name: ai-benchmark-roundrobin-2
+  url: http://fake-provider.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-roundrobin-2
+    paths:
+    - /bench/routing/roundrobin-2
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        response_streaming: deny
+        max_request_body_size: 1048576
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          retries: 1
+          slots: 1000
+          connect_timeout: 60000
+          read_timeout: 60000
+          write_timeout: 60000
+        targets:
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-gpt-4o-mini
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-gpt-4o-mini-b
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+- name: ai-benchmark-roundrobin-10
+  url: http://fake-provider.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-roundrobin-10
+    paths:
+    - /bench/routing/roundrobin-10
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        response_streaming: deny
+        max_request_body_size: 1048576
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          retries: 1
+          slots: 1000
+          connect_timeout: 60000
+          read_timeout: 60000
+          write_timeout: 60000
+        targets:
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-01
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-02
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-03
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-04
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-05
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-06
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-07
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-08
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-09
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-model-10
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+- name: ai-benchmark-ewma
+  url: http://fake-provider.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-ewma
+    paths:
+    - /bench/routing/ewma
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        response_streaming: deny
+        max_request_body_size: 1048576
+        model_name_header: true
+        balancer:
+          algorithm: lowest-latency
+          retries: 1
+          slots: 1000
+          latency_strategy: tpot
+          connect_timeout: 60000
+          read_timeout: 60000
+          write_timeout: 60000
+        targets:
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-fast
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-slow
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+- name: ai-benchmark-failover
+  url: http://fake-provider.upstream.svc.cluster.local:8080
+  routes:
+  - name: ai-benchmark-failover
+    paths:
+    - /bench/routing/failover
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        response_streaming: deny
+        max_request_body_size: 1048576
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          retries: 2
+          slots: 1000
+          connect_timeout: 5000
+          read_timeout: 10000
+          write_timeout: 10000
+          failover_criteria:
+          - error
+          - timeout
+          - http_500
+          - http_502
+          - http_503
+          - http_504
+        targets:
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-primary-failing
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions?status=500
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+        - route_type: llm/v1/chat
+          weight: 1
+          model:
+            provider: openai
+            name: mock-fallback
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: false
+            log_statistics: false
+- name: ai-benchmark-payload-logging
+  url: http://fake-provider.upstream.svc.cluster.local:8081
+  routes:
+  - name: ai-benchmark-payload-logging
+    paths:
+    - /bench/logging/chat/openai
+    strip_path: false
+    plugins:
+    - name: ai-proxy-advanced
+      config:
+        llm_format: openai
+        genai_category: text/generation
+        response_streaming: deny
+        max_request_body_size: 8388608
+        model_name_header: true
+        balancer:
+          algorithm: round-robin
+          tokens_count_strategy: total-tokens
+        targets:
+        - route_type: llm/v1/chat
+          weight: 100
+          model:
+            provider: openai
+            name: mock-gpt-4o-mini
+            options:
+              upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions
+          auth:
+            allow_override: false
+          logging:
+            log_payloads: true
+            log_statistics: true

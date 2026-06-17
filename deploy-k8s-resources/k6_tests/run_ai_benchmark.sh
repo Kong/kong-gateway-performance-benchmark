@@ -114,7 +114,9 @@ K6_AI_STREAM_VUS=
 K6_AI_DURATION=
 K6_AI_PRE_ALLOCATED_VUS=
 K6_AI_MAX_VUS=
-K6_AI_APIKEY=
+# Preserve a caller-provided API key (e.g. LiteLLM master key for comparisons);
+# scenario cases below still override it where they need a specific key.
+K6_AI_APIKEY="${K6_AI_APIKEY:-}"
 K6_AI_SCENARIO_NAME=
 K6_AI_CACHE_MODE=
 K6_AI_MODEL=
@@ -124,6 +126,10 @@ case "$SCENARIO" in
   static-chat)
     SCRIPT_FILE="k6_ai_static_chat.js"
     K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/static/chat"
+    # The static route's single ai-proxy-advanced target is model
+    # 'wiremock-static-chat'; the request model must match it or the plugin
+    # rejects with "cannot use own model - must be: wiremock-static-chat".
+    K6_AI_MODEL="wiremock-static-chat"
     K6_AI_RATE=${LOAD:-25}
     K6_AI_DURATION=${DURATION:-3m}
     K6_AI_PRE_ALLOCATED_VUS=50

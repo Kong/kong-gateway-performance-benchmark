@@ -74,6 +74,23 @@ resource "kubernetes_secret" "kong_license" {
   depends_on = [kubernetes_namespace.kong]
 }
 
+# DB-less declarative config for the AI benchmark routes. The Kong Ingress
+# Controller is bypassed (it hangs against the AI-gateway dev image), so routes
+# are loaded from this ConfigMap via the chart's dblessConfig.configMap, which
+# mounts it and sets KONG_DECLARATIVE_CONFIG so the config survives pod restarts.
+resource "kubernetes_config_map" "kong_declarative" {
+  metadata {
+    name      = "kong-declarative"
+    namespace = "kong"
+  }
+
+  data = {
+    "kong.yml" = file("${path.module}/kong_helm/declarative/kong-full.yaml")
+  }
+
+  depends_on = [kubernetes_namespace.kong]
+}
+
 resource "kubernetes_config_map" "kong_load_test" {
   metadata {
     name      = "kong-load-test"

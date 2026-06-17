@@ -1,0 +1,15 @@
+# metrics-server values for the benchmark cluster.
+# EKS self-managed nodes serve kubelet over a cert that metrics-server cannot
+# verify against the cluster CA, so allow insecure kubelet TLS and prefer the
+# node InternalIP for scraping.
+args:
+  - --kubelet-insecure-tls
+  - --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 200Mi

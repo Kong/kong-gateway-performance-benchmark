@@ -60,9 +60,11 @@ export function buildTunedHeaders(fixture) {
     'x-llm-prompt-tokens': String(fixture.prompt_tokens),
   }
 
-  // Support custom Authorization header for gateways like LiteLLM
-  if (__ENV.K6_AI_AUTH_TOKEN) {
-    headers['Authorization'] = `Bearer ${__ENV.K6_AI_AUTH_TOKEN}`
+  // Support custom Authorization header for gateways like LiteLLM. The runner
+  // plumbs the token end-to-end as K6_AI_APIKEY; accept K6_AI_AUTH_TOKEN too.
+  const authToken = __ENV.K6_AI_APIKEY || __ENV.K6_AI_AUTH_TOKEN
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`
   }
 
   if (fixture.completion_tokens !== undefined) {

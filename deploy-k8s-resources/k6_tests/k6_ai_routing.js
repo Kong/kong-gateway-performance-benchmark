@@ -70,9 +70,16 @@ export const options = {
 }
 
 export default function () {
+  // For multi-target balancer routing (round-robin/ewma/failover), the client
+  // must NOT pin a model: ai-proxy-advanced assigns the selected target's model
+  // itself, and a client-supplied model collides with target selection
+  // ("cannot use own model - must be: <target>"). Strip it from the payload.
+  const routingPayload = buildOpenAiChatRequest(fixture, false)
+  delete routingPayload.model
+
   const response = http.post(
     url,
-    JSON.stringify(buildOpenAiChatRequest(fixture, false)),
+    JSON.stringify(routingPayload),
     {
       timeout: __ENV.K6_AI_TIMEOUT || '60s',
       headers: buildTunedHeaders(fixture),

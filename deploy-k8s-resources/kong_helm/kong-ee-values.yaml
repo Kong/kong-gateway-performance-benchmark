@@ -12,8 +12,17 @@ proxy:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8100"
 
+# KIC is bypassed (see ingressController below); enable the admin API on an
+# internal ClusterIP so declarative config can be pushed to /config directly.
 admin:
-  enabled: false
+  enabled: true
+  type: ClusterIP
+  http:
+    enabled: true
+    servicePort: 8001
+    containerPort: 8001
+  tls:
+    enabled: false
 
 manager:
   enabled: false
@@ -41,8 +50,18 @@ env:
   database: "off"
   anonymous_reports: "off"
 
+# Load the AI benchmark routes from the kong-declarative ConfigMap at startup so
+# the DB-less config persists across Kong pod restarts (the chart mounts it and
+# sets KONG_DECLARATIVE_CONFIG). Routes can still be hot-reloaded via POST /config.
+dblessConfig:
+  configMap: kong-declarative
+
+# Bypass the Kong Ingress Controller: it hangs at "Getting the kong admin api
+# client configuration" against this AI-gateway dev image (KIC 3.5.9), which
+# blocks the whole release. Run Kong standalone DB-less instead and load routes
+# by pushing a declarative config to the admin API /config endpoint.
 ingressController:
-  enabled: true
+  enabled: false
 
 nodeSelector:
   benchmark.konghq.com/node-role: kong

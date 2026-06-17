@@ -128,7 +128,7 @@ config:
         provider: gemini
         name: mock-gemini-2.5-flash
         options:
-          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1beta/models/mock-gemini:streamGenerateContent
+          upstream_url: http://fake-provider.upstream.svc.cluster.local:8080
 ---
 apiVersion: configuration.konghq.com/v1
 kind: KongPlugin

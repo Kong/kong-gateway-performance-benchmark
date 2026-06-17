@@ -1,0 +1,4 @@
+# grafana/k6-operator values.
+# Kept minimal: the chart's values schema is strict, and namespace.create /
+# customLabels.app are supplied via Terraform `set` blocks. The operator
+# controller is lightweight and schedules on the untainted support node group.

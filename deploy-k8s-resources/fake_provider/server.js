@@ -183,12 +183,14 @@ function createEmbeddingVector(text, index) {
   })
 }
 
-function buildOpenAiChatResponse(promptTokens, completionTokens, responseText) {
+function buildOpenAiChatResponse(promptTokens, completionTokens, responseText, model = responseModel) {
   return {
     id: `chatcmpl-${Date.now()}`,
     object: 'chat.completion',
     created: Math.floor(Date.now() / 1000),
-    model: responseModel,
+    // Echo the requested model so ai-proxy-advanced's per-target model
+    // validation passes for multi-target routing scenarios.
+    model: model || responseModel,
     choices: [
       {
         index: 0,
@@ -207,7 +209,7 @@ function buildOpenAiChatResponse(promptTokens, completionTokens, responseText) {
   }
 }
 
-async function sendOpenAiStream(res, promptTokens, completionTokens, timing) {
+async function sendOpenAiStream(res, promptTokens, completionTokens, timing, model = responseModel) {
   const created = Math.floor(Date.now() / 1000)
   const streamId = `chatcmpl-${Date.now()}`
   const tokens = paddedTokens(completionTokens)
@@ -236,7 +238,7 @@ async function sendOpenAiStream(res, promptTokens, completionTokens, timing) {
       id: streamId,
       object: 'chat.completion.chunk',
       created,
-      model: responseModel,
+      model: model || responseModel,
       choices: [{ index: 0, delta }],
     })}\n\n`)
 
@@ -249,7 +251,7 @@ async function sendOpenAiStream(res, promptTokens, completionTokens, timing) {
     id: streamId,
     object: 'chat.completion.chunk',
     created,
-    model: responseModel,
+    model: model || responseModel,
     choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
     usage: {
       prompt_tokens: promptTokens,
@@ -313,14 +315,14 @@ async function handleOpenAiChat(req, res, body) {
   const stream = body.stream === true || getHeaderBoolean(req, 'x-llm-stream')
 
   if (stream) {
-    await sendOpenAiStream(res, promptTokens, completionTokens, timing)
+    await sendOpenAiStream(res, promptTokens, completionTokens, timing, body.model)
     return
   }
 
   const totalDelay = timing.ttftMs + (timing.tpotMs * completionTokens)
   const responseText = paddedTokens(completionTokens).join(' ')
   await sleep(totalDelay)
-  sendJson(res, 200, buildOpenAiChatResponse(promptTokens, completionTokens, responseText))
+  sendJson(res, 200, buildOpenAiChatResponse(promptTokens, completionTokens, responseText, body.model))
 }
 
 async function handleGeminiChat(req, res, body) {

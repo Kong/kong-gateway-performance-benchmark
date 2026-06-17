@@ -33,27 +33,27 @@ data:
       - model_name: mock-gpt-4o-mini
         litellm_params:
           model: openai/mock-gpt-4o-mini
-          api_base: http://fake-provider.upstream.svc.cluster.local:8081/v1
+          api_base: http://fake-provider.upstream.svc.cluster.local:8080/v1
           api_key: fake-key
           
       - model_name: mock-gemini-2.5-flash
         litellm_params:
           model: openai/mock-gemini-2.5-flash
-          api_base: http://fake-provider.upstream.svc.cluster.local:8081/v1
+          api_base: http://fake-provider.upstream.svc.cluster.local:8080/v1
           api_key: fake-key
 
       # Mock embedding model
       - model_name: text-embedding-3-small
         litellm_params:
           model: openai/text-embedding-3-small
-          api_base: http://fake-provider.upstream.svc.cluster.local:8081/v1
+          api_base: http://fake-provider.upstream.svc.cluster.local:8080/v1
           api_key: fake-key
 
       # Large payload model
       - model_name: mock-large-context
         litellm_params:
           model: openai/mock-gpt-4o-mini
-          api_base: http://fake-provider.upstream.svc.cluster.local:8081/v1
+          api_base: http://fake-provider.upstream.svc.cluster.local:8080/v1
           api_key: fake-key
 
     litellm_settings:
@@ -127,13 +127,13 @@ spec:
               memory: "8Gi"
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/liveliness
               port: 4000
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/readiness
               port: 4000
             initialDelaySeconds: 10
             periodSeconds: 5
