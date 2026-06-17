@@ -1,0 +1,40 @@
+# =============================================================================
+# Release Regression Gates — version-over-version tolerances
+# =============================================================================
+# Used by compare_release.py to decide whether a new release regressed vs the
+# baseline. This is the RELATIVE gate; absolute SLO floors live in
+# benchmark_config.yaml and are still enforced independently.
+#
+# Direction semantics per metric:
+#   latency / ttft / error_rate : HIGHER is worse  (regression if it goes up)
+#   throughput (rps)            : LOWER  is worse  (regression if it goes down)
+# =============================================================================
+
+# Default tolerances applied to every scenario unless overridden below.
+# A change within `warn` is acceptable noise; between `warn` and `fail` is a
+# soft warning (logged, not escalated); beyond `fail` is a REGRESSION.
+defaults:
+  p95_ms:        { warn_pct: 5,  fail_pct: 15 }
+  p99_ms:        { warn_pct: 5,  fail_pct: 20 }
+  ttft_p95_ms:    { warn_pct: 5,  fail_pct: 15 }   # streaming only
+  throughput_rps: { warn_pct: 5,  fail_pct: 10 }   # drop beyond this = regression
+  error_rate_pct: { warn_abs: 0.5, fail_abs: 1.0 } # absolute points, not %
+
+# Absolute-noise floor: ignore latency regressions when the metric is tiny.
+# A +15% jump on a 4ms metric (→4.6ms) is noise, not a regression.
+noise_floor:
+  latency_ms: 20      # skip latency regression checks below this absolute value
+
+# Per-scenario overrides (optional). Streaming cares about TTFT, not total.
+scenarios:
+  stream-openai:
+    ttft_p95_ms: { warn_pct: 5, fail_pct: 15 }
+  stream-gemini:
+    ttft_p95_ms: { warn_pct: 5, fail_pct: 15 }
+
+# Statistical-validity gate (mirrors benchmark_config.yaml). A release whose
+# repeats are too noisy is marked UNSTABLE — comparison is not trustworthy and
+# should be re-run rather than escalated as a regression.
+stability:
+  min_repeats: 3
+  max_coefficient_of_variation_percent: 15.0
