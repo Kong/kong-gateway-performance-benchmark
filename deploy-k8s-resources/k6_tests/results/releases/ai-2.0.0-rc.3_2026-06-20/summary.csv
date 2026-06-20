@@ -1,0 +1,11 @@
+scenario,p95_ms,p99_ms,ttft_p95_ms,throughput_rps,error_rate_pct,checks_pass_pct,repeats,cv_p95_pct
+embeddings-openai,52.478,52.806,,49.99,0.0,100.0,3,0.25
+payload-logging,614.557,614.892,,24.92,0.0,100.0,3,0.01
+routing-ewma,614.594,614.93,,24.92,0.0,100.0,3,0.0
+routing-failover,614.555,614.907,,24.92,0.0,100.0,3,0.01
+routing-roundrobin-10,614.609,614.928,,24.92,0.0,100.0,3,0.01
+routing-roundrobin-2,614.515,614.756,,24.92,0.0,100.0,3,0.01
+static-chat,122.375,122.713,,49.97,0.0,100.0,3,0.08
+stream-gemini,1326.097,1328.992,122.865,22.64,0.0,100.0,3,0.01
+stream-openai,1325.944,1328.225,523.837,22.64,0.0,100.0,3,0.01
+token-chat-openai,614.473,614.799,,49.84,0.0,100.0,3,0.0

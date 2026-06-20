@@ -1,0 +1,180 @@
+name: EKS AI Gateway Benchmark
+
+# Manual trigger only — this provisions real, expensive EKS infrastructure
+# (including c5.metal nodes) and tears it down at the end of the run.
+on:
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: >-
+          Space-separated benchmark invocations, one per line is also fine.
+          Each entry is passed verbatim to run_ai_benchmark.sh.
+          Example: "token-chat-openai short 25 6m"
+        type: string
+        default: "token-chat-openai short 5 1m"
+      kong_repository:
+        description: "Kong image repository"
+        type: string
+        default: "kong/kong-ai-gateway-dev"
+      kong_version:
+        description: "Kong image tag"
+        type: string
+        default: "ai-2.0.0-rc.2"
+      kong_effective_semver:
+        description: "Semantic version for non-semver/dev tags (Helm image.effectiveSemver). Leave blank for release tags."
+        type: string
+        default: "2.0.0"
+      region:
+        description: "AWS region"
+        type: string
+        default: "us-west-2"
+      teardown:
+        description: "Run terraform destroy after the benchmark (uncheck to keep the cluster for inspection)"
+        type: boolean
+        default: true
+
+# Only one benchmark run at a time — they share IAM role names and would collide.
+concurrency:
+  group: eks-benchmark
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    # Cluster create (~20m) + deploy (~10m) + tests + teardown. Give it plenty of room.
+    timeout-minutes: 300
+    env:
+      AWS_DEFAULT_REGION: ${{ inputs.region }}
+      TF_VAR_region: ${{ inputs.region }}
+      # On the high-permission CI account we let Terraform create the IAM roles,
+      # OIDC provider and EBS CSI add-on natively — no role reuse / workarounds.
+      TF_VAR_enable_irsa: "true"
+      TF_VAR_enable_ebs_csi_addon: "true"
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.region }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.6"
+          terraform_wrapper: false
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Setup yq (mikefarah)
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      # ---------- Phase 1: provision EKS cluster ----------
+      - name: Terraform apply — EKS cluster
+        working-directory: provision-eks-cluster
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve -input=false
+          echo "CLUSTER_NAME=$(terraform output -raw cluster_name)" >> "$GITHUB_ENV"
+
+      - name: Update kubeconfig
+        run: |
+          aws eks --region "${{ inputs.region }}" update-kubeconfig --name "$CLUSTER_NAME"
+
+      - name: Wait for nodes Ready
+        run: |
+          kubectl wait --for=condition=Ready nodes --all --timeout=15m
+          kubectl get nodes -L benchmark.konghq.com/node-role
+
+      # ---------- Phase 2: deploy Kong + test infrastructure ----------
+      - name: Write Kong license
+        run: |
+          printf '%s' '${{ secrets.KONG_LICENSE }}' > deploy-k8s-resources/kong_helm/license.json
+          test -s deploy-k8s-resources/kong_helm/license.json
+
+      - name: Terraform apply — Kong + k6 + observability
+        working-directory: deploy-k8s-resources
+        env:
+          TF_VAR_kong_enterprise: "true"
+          TF_VAR_kong_repository: ${{ inputs.kong_repository }}
+          TF_VAR_kong_version: ${{ inputs.kong_version }}
+          TF_VAR_kong_effective_semver: ${{ inputs.kong_effective_semver }}
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve -input=false
+
+      - name: Wait for Kong and k6 operator
+        run: |
+          kubectl rollout status -n kong deploy --timeout=10m --all || true
+          kubectl get pods -A
+
+      # ---------- Phase 3: AI routing config ----------
+      - name: Apply AI benchmark routes
+        working-directory: deploy-k8s-resources/kong_helm
+        run: |
+          for f in ai-benchmark-suite.yaml ai-benchmark-policy-suite.yaml \
+                   ai-routing-benchmark.yaml ai-logging-benchmark.yaml; do
+            [ -f "$f" ] && kubectl apply -f "$f" || echo "skip missing $f"
+          done
+
+      # ---------- Phase 4: run benchmarks ----------
+      - name: Run benchmark scenarios
+        working-directory: deploy-k8s-resources/k6_tests
+        env:
+          KONG_VERSION: ${{ inputs.kong_version }}
+        run: |
+          set -euo pipefail
+          # Each non-empty line of the input is one scenario invocation.
+          echo "${{ inputs.scenarios }}" | while IFS= read -r line; do
+            [ -z "$(echo "$line" | tr -d '[:space:]')" ] && continue
+            echo "::group::run_ai_benchmark.sh $line"
+            bash run_ai_benchmark.sh $line
+            # Wait for the k6 TestRun job to finish before starting the next one.
+            kubectl wait --for=condition=complete -n k6 job \
+              -l k6_cr=k6-ai-benchmark --timeout=20m || \
+              kubectl logs -n k6 -l k6_cr=k6-ai-benchmark --all-containers=true --tail=200
+            echo "::endgroup::"
+          done
+
+      - name: Collect results
+        if: always()
+        run: |
+          mkdir -p artifacts
+          cp -r deploy-k8s-resources/k6_tests/results artifacts/ 2>/dev/null || true
+          kubectl logs -n k6 -l k6_cr=k6-ai-benchmark --all-containers=true --tail=-1 \
+            > artifacts/k6-logs.txt 2>/dev/null || true
+          kubectl get pods -A -o wide > artifacts/pods.txt 2>/dev/null || true
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: artifacts/
+          if-no-files-found: warn
+
+      # ---------- Phase 5: teardown ----------
+      - name: Terraform destroy — deploy layer
+        if: always() && inputs.teardown
+        working-directory: deploy-k8s-resources
+        run: terraform destroy -auto-approve -input=false || true
+
+      - name: Terraform destroy — EKS cluster
+        if: always() && inputs.teardown
+        working-directory: provision-eks-cluster
+        run: terraform destroy -auto-approve -input=false || true

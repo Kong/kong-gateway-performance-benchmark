@@ -12,8 +12,11 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  cluster_name = "${var.cluster_name}-${random_string.suffix.result}"
-  
+  cluster_name            = "${var.cluster_name}-${random_string.suffix.result}"
+  reuse_cluster_iam_role  = var.cluster_iam_role_arn != null && trimspace(var.cluster_iam_role_arn) != ""
+  reuse_node_iam_role     = var.node_iam_role_arn != null && trimspace(var.node_iam_role_arn) != ""
+  reuse_ebs_csi_irsa_role = var.ebs_csi_irsa_role_arn != null && trimspace(var.ebs_csi_irsa_role_arn) != ""
+
   # Base node groups (always present)
   base_node_groups = {
     one = {
@@ -74,7 +77,7 @@ locals {
       }
     }
   }
-  
+
   # LiteLLM node group (optional, for gateway comparison benchmarks)
   litellm_node_group = var.enable_litellm_node_group ? {
     litellm = {
@@ -99,7 +102,7 @@ locals {
       }
     }
   } : {}
-  
+
   # Merged node groups
   eks_managed_node_groups = merge(local.base_node_groups, local.litellm_node_group)
 }
@@ -142,13 +145,18 @@ module "eks" {
 
   cluster_name    = local.cluster_name
   cluster_version = var.cluster_version
+  create_iam_role = !local.reuse_cluster_iam_role
+  iam_role_arn    = local.reuse_cluster_iam_role ? var.cluster_iam_role_arn : null
 
   vpc_id                         = module.vpc.vpc_id
   subnet_ids                     = module.vpc.private_subnets
   cluster_endpoint_public_access = true
+  enable_irsa                    = var.enable_irsa
 
   eks_managed_node_group_defaults = {
-    ami_type = "AL2_x86_64"
+    ami_type        = "AL2_x86_64"
+    create_iam_role = !local.reuse_node_iam_role
+    iam_role_arn    = local.reuse_node_iam_role ? var.node_iam_role_arn : null
   }
 
   # Node groups defined in locals for conditional LiteLLM support
@@ -168,6 +176,8 @@ data "aws_eks_addon_version" "ebs_csi" {
 }
 
 module "irsa-ebs-csi" {
+  count = var.enable_ebs_csi_addon && var.enable_irsa && !local.reuse_ebs_csi_irsa_role ? 1 : 0
+
   source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role-with-oidc"
   version = "4.7.0"
 
@@ -179,17 +189,14 @@ module "irsa-ebs-csi" {
 }
 
 resource "aws_eks_addon" "ebs-csi" {
+  count = var.enable_ebs_csi_addon ? 1 : 0
+
   cluster_name             = module.eks.cluster_name
   addon_name               = "aws-ebs-csi-driver"
   addon_version            = coalesce(var.ebs_csi_addon_version, data.aws_eks_addon_version.ebs_csi.version)
-  service_account_role_arn = module.irsa-ebs-csi.iam_role_arn
+  service_account_role_arn = local.reuse_ebs_csi_irsa_role ? var.ebs_csi_irsa_role_arn : (var.enable_irsa ? module.irsa-ebs-csi[0].iam_role_arn : null)
   tags = {
     "eks_addon" = "ebs-csi"
     "terraform" = "true"
   }
-
-  depends_on = [
-    module.eks,
-    module.irsa-ebs-csi,
-  ]
 }

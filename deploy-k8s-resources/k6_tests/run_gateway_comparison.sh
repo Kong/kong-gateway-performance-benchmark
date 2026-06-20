@@ -148,6 +148,14 @@ ROUTE_PATTERNS["litellm:stream-gemini"]="/chat/completions"  # LiteLLM normalize
 ROUTE_PATTERNS["litellm:embeddings-openai"]="/embeddings"
 ROUTE_PATTERNS["litellm:static-chat"]="/chat/completions"
 
+# Model overrides per gateway (LiteLLM uses prefixed model names)
+declare -A GATEWAY_MODEL
+GATEWAY_MODEL[litellm]="mock-gpt-4o-mini"
+
+# API key overrides per gateway
+declare -A GATEWAY_APIKEY
+GATEWAY_APIKEY[litellm]="sk-litellm-master-key"
+
 # -----------------------------------------------------------------------------
 # Helper Functions
 # -----------------------------------------------------------------------------
@@ -235,6 +243,8 @@ run_benchmark_for_gateway() {
     # Override the URL for this gateway
     K6_AI_CHAT_URL_OVERRIDE="$full_url" \
     GATEWAY="$gateway" \
+    K6_AI_MODEL_OVERRIDE="${GATEWAY_MODEL[$gateway]:-}" \
+    K6_AI_APIKEY="${GATEWAY_APIKEY[$gateway]:-}" \
     bash "$SCRIPT_DIR/run_ai_benchmark.sh" \
       "$SCENARIO" \
       "$FIXTURE" \

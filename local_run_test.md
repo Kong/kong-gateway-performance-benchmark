@@ -19,6 +19,9 @@ yq --version           # mikefarah/yq >= 4.x（不是 python-yq）
 # 1. AWS 登录
 aws sso login
 
+# 如果你的 default profile 是短期 session，先导出一份可供 Terraform 使用的环境变量
+eval "$(aws configure export-credentials --profile default --format env)"
+
 # 2. 进入集群 Terraform 目录
 cd provision-eks-cluster/
 
@@ -28,10 +31,21 @@ export TF_VAR_cluster_name=kong-perf
 export TF_VAR_instance_type=c5.metal          # k6 loadgen 节点
 export TF_VAR_instance_type_kong=c5.4xlarge   # Kong 节点
 export TF_VAR_instance_type_support=c5.2xlarge # 支撑服务节点
+# 如需复用已存在的 EKS Cluster Role（避免创建新 IAM role）
+export TF_VAR_cluster_iam_role_arn=arn:aws:iam::267914366688:role/tony-eks-cluster-test-role
+# 如需复用已存在的 EKS Node Role（避免为各 node group 创建新 IAM role）
+export TF_VAR_node_iam_role_arn=arn:aws:iam::267914366688:role/tony-test-role-ec2
+# 如需复用已存在的 EBS CSI IRSA Role（避免创建新 IAM role）
+export TF_VAR_ebs_csi_irsa_role_arn=arn:aws:iam::267914366688:role/YOUR_EBS_CSI_IRSA_ROLE
+# 如果当前账号没有 iam:CreateOpenIDConnectProvider，可先关闭 IRSA/OIDC 与 EBS CSI addon，先把集群建起来
+export TF_VAR_enable_irsa=false
+export TF_VAR_enable_ebs_csi_addon=false
 
 terraform init -input=false
 terraform plan -out eks.plan -input=false
 terraform apply -auto-approve eks.plan
+
+# 如果 apply 很长，重新执行一次 export-credentials 再继续，避免 token 在等待 node group 时过期
 
 # 3. 更新 kubeconfig
 aws eks --region $(terraform output -raw region) update-kubeconfig \
@@ -51,8 +65,10 @@ cd ../deploy-k8s-resources/
 # ---- Kong Enterprise（需要 license.json）----
 cp your-license.json kong_helm/license.json
 export TF_VAR_kong_enterprise=true
-export TF_VAR_kong_repository=kong/kong-gateway
-export TF_VAR_kong_version=3.14.0.3
+export TF_VAR_kong_repository=kong/kong-ai-gateway-dev
+export TF_VAR_kong_version=ai-2.0.0-rc.2
+# 非标准 semver 的 dev 镜像，必须设 effectiveSemver 供 Helm chart 判定版本特性
+export TF_VAR_kong_effective_semver=2.0.0
 
 # ---- 如果 EKS 集群用了 Workspace ----
 export TF_VAR_eks_state_workspace=YOUR_WORKSPACE_NAME

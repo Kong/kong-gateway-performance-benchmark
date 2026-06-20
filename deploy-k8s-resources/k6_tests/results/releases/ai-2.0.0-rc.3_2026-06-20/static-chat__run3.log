@@ -1,0 +1,6 @@
+AI benchmark summary: static chat
+http_reqs/s: 49.97
+http_req_duration p95(ms): 122.445688
+http_req_duration p99(ms): 122.69724054
+http_req_failed(%): 0.00
+checks pass rate(%): 100.00

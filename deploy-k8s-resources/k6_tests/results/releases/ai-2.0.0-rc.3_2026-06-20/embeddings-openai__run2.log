@@ -1,0 +1,6 @@
+AI benchmark summary: embeddings openai (short)
+http_reqs/s: 49.99
+http_req_duration p95(ms): 52.299121
+http_req_duration p99(ms): 52.671297
+http_req_failed(%): 0.00
+checks pass rate(%): 100.00

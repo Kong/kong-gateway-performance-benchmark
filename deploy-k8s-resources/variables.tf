@@ -17,19 +17,19 @@ variable "kong_enterprise" {
 variable "kong_repository" {
   description = "Kong image repository"
   type        = string
-  default     = "kong/kong"
+  default     = "kong/kong-ai-gateway-dev"
 }
 
 variable "kong_version" {
   description = "Kong version to deploy"
   type        = string
-  default     = "3.6"
+  default     = "ai-2.0.0-rc.2"
 }
 
 variable "kong_effective_semver" {
-  description = "Semantic version, required if using a kong_version that does not look like a semver, e.g. 'nightly'"
+  description = "Semantic version, required if using a kong_version that does not look like a semver, e.g. 'nightly' or 'ai-2.0.0-rc.2'"
   type        = string
-  default     = null
+  default     = "2.0.0"
 }
 
 variable "kong_worker_processes" {

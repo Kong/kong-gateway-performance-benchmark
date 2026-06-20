@@ -7,6 +7,166 @@ Scripts to deploy:
 - A test upstream ([go-bench-suite](https://github.com/asoorm/go-bench-suite))
 - [k6 operator](https://github.com/grafana/k6-operator)
 
+---
+
+## Quick Start Guide
+
+This section provides a complete walkthrough for deploying the benchmark environment, running tests, and cleaning up resources.
+
+### Resource Requirements
+
+The EKS cluster uses dedicated node groups for workload isolation:
+
+| Node Group | Instance Type | vCPU | Memory | Count (min/desired/max) | Purpose |
+|------------|---------------|------|--------|-------------------------|---------|
+| **loadgen** | c5.metal | 96 | 192 GB | 1/1/3 | k6 load generators |
+| **kong** | c5.4xlarge | 16 | 32 GB | 1/1/2 | Kong Gateway |
+| **support** | c5.2xlarge | 8 | 16 GB | 1/1/2 | Redis, Prometheus, Grafana, mocks |
+| **litellm** (optional) | c5.4xlarge | 16 | 32 GB | 1/1/2 | LiteLLM proxy for comparison |
+
+**Estimated costs (us-west-2 on-demand pricing):**
+
+| Configuration | Nodes | Total vCPU | Total Memory | Est. Cost/Hour |
+|---------------|-------|------------|--------------|----------------|
+| Default (no LiteLLM) | 3 | 120 | 240 GB | ~$6.50 |
+| With LiteLLM | 4 | 136 | 272 GB | ~$7.90 |
+
+> **Cost optimization**: The c5.metal instance (~$4.08/hr) is the largest cost. For lighter workloads, override with `terraform apply -var="instance_type=c5.4xlarge"` to reduce costs to ~$2.80/hr.
+
+### Step 1: Create the EKS Cluster
+
+```bash
+# Authenticate with AWS
+aws sso login
+
+# Create the cluster (takes 15-20 minutes)
+cd provision-eks-cluster
+terraform init -input=false
+terraform plan -out eks.plan -input=false
+terraform apply -auto-approve eks.plan
+
+# Configure kubectl
+aws eks --region $(terraform output -raw region) update-kubeconfig \
+    --name $(terraform output -raw cluster_name)
+
+# Verify nodes are ready
+kubectl get nodes
+```
+
+**Optional**: Enable LiteLLM node group for gateway comparison benchmarks:
+```bash
+terraform apply -var="enable_litellm_node_group=true"
+```
+
+### Step 2: Deploy Kong and Supporting Services
+
+```bash
+# For Kong Enterprise (recommended for AI Gateway benchmarks)
+export TF_VAR_kong_enterprise=true
+export TF_VAR_kong_repository=kong/kong-ai-gateway-dev
+export TF_VAR_kong_version=ai-2.0.0-rc.2
+export TF_VAR_kong_effective_semver=2.0.0   # non-semver dev tag needs this
+
+# Deploy all services
+cd ../deploy-k8s-resources
+terraform init -input=false
+terraform plan -out deploy.plan -input=false
+terraform apply -auto-approve deploy.plan
+
+# Apply AI benchmark configuration
+kubectl apply -f kong_helm/ai-benchmark-suite.yaml
+```
+
+### Step 3: Run Benchmark Tests
+
+**Single scenario test:**
+```bash
+cd k6_tests
+bash run_ai_benchmark.sh token-chat-openai short 25 6m
+```
+
+**Full campaign with multiple VU levels:**
+```bash
+# Runs 5 VU levels × 3 repeats ≈ 1.75 hours
+./run_stream_openai_campaign.sh 3 ./results/my-campaign
+```
+
+**Kong vs LiteLLM comparison (requires LiteLLM node group):**
+```bash
+kubectl apply -f ../kong_helm/litellm-deployment.yaml
+./run_kong_vs_litellm_comparison.sh --eks --repeats 3
+```
+
+### Test Duration Estimates
+
+| Test Type | Configuration | Estimated Duration |
+|-----------|---------------|-------------------|
+| Single scenario | 6m duration | ~7 minutes |
+| Single campaign | 5 VU levels × 3 repeats | ~1.75 hours |
+| Kong vs LiteLLM | 6 scenarios × 2 gateways × 3 repeats | ~4 hours |
+| Full AI suite | 8 scenarios × 5 VU levels × 3 repeats | ~14 hours |
+
+### Step 4: View Results
+
+```bash
+# Port-forward Grafana
+kubectl port-forward svc/grafana 3000:3000 -n monitoring
+
+# Open http://localhost:3000 and navigate to:
+# - k6 Prometheus dashboard for real-time metrics
+# - Kong dashboard for gateway metrics
+```
+
+Results are also saved to `./results/` directory with CSV exports.
+
+### Step 5: Clean Up Resources
+
+**⚠️ Important: Resources are NOT automatically released after tests complete.**
+
+**Recommended cleanup order** (avoids AWS dependency issues):
+
+```bash
+# From repository root
+aws sso login
+./destroy_eks_benchmark.sh
+```
+
+Or manually:
+```bash
+# 1. Destroy Kubernetes resources first
+cd deploy-k8s-resources
+terraform destroy -auto-approve
+
+# 2. Then destroy EKS cluster
+cd ../provision-eks-cluster
+terraform destroy -auto-approve
+```
+
+**Cost-saving alternatives** (if you need to pause but keep the cluster):
+
+```bash
+# Scale node groups to zero
+aws eks update-nodegroup-config \
+  --cluster-name kong-perf \
+  --nodegroup-name loadgen \
+  --scaling-config minSize=0,maxSize=3,desiredSize=0
+
+aws eks update-nodegroup-config \
+  --cluster-name kong-perf \
+  --nodegroup-name kong \
+  --scaling-config minSize=0,maxSize=2,desiredSize=0
+
+aws eks update-nodegroup-config \
+  --cluster-name kong-perf \
+  --nodegroup-name support \
+  --scaling-config minSize=0,maxSize=2,desiredSize=0
+```
+
+This reduces EC2 costs to near zero while preserving the cluster configuration.
+
+---
+
+## Detailed Setup Instructions
 
 Run `provision-eks-cluster` terraform scripts first to create the EKS cluster
 
@@ -43,8 +203,9 @@ Extra configurations for [Kong Enterprise](https://konghq.com/products/kong-ente
 2. Add terraform variables
 ```
 export TF_VAR_kong_enterprise=true
-export TF_VAR_kong_repository=kong/kong-gateway
-export TF_VAR_kong_version=3.6
+export TF_VAR_kong_repository=kong/kong-ai-gateway-dev
+export TF_VAR_kong_version=ai-2.0.0-rc.2
+export TF_VAR_kong_effective_semver=2.0.0
 ```
 3. If you are testing non-release kong enterprise image, you also need to set `kong_effective_semver` along with other variables like 
 ```
