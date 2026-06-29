@@ -134,6 +134,20 @@ Exit codes:
 - `1` — FAILED: SLO violations detected
 - `2` — WARNING: SLOs met with stability warnings
 
+Release baseline comparison also enforces absolute SLOs from `benchmark_config.yaml`.
+This means a release can fail even when relative regression gates pass, if any
+scenario exceeds absolute limits (for example scenario `max_ttft_p95_ms`).
+
+```bash
+# Override absolute SLO config path when needed
+SLO_CONFIG_PATH=./benchmark_config.yaml ./run_release_baseline.sh
+```
+
+Release run directories now include per-repeat driver logs for triage:
+
+- `<scenario>__runN.driver.log` — orchestrator and kubectl driver output
+- `<scenario>__runN.log` — extracted benchmark summary metrics
+
 ## Multi-Gateway Comparison
 
 Compare performance across different AI gateways:
