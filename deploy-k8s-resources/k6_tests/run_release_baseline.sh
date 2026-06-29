@@ -18,6 +18,7 @@ cd "$SCRIPT_DIR"
 VERSION="${VERSION:-unknown}"
 REPEATS="${REPEATS:-3}"
 DURATION="${DURATION:-3m}"
+INCLUDE_MLFLOW50_TRACK="${INCLUDE_MLFLOW50_TRACK:-true}"
 GATES_FILE="${RELEASE_GATES_PATH:-$SCRIPT_DIR/release_gates.yaml}"
 SLO_CONFIG_FILE="${SLO_CONFIG_PATH:-$SCRIPT_DIR/benchmark_config.yaml}"
 CAPTURED_AT="${CAPTURED_AT:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}"
@@ -56,8 +57,21 @@ SCENARIOS=(
   "payload-logging:short:25"
 )
 
+# MLflow-style fixed-delay track for gateway-overhead gating.
+if [[ "$INCLUDE_MLFLOW50_TRACK" == "true" ]]; then
+  SCENARIOS+=(
+    "token-chat-openai:mlflow50:50"
+    "direct-token-chat-openai:mlflow50:50"
+    "stream-openai:mlflow50:30"
+    "direct-stream-openai:mlflow50:30"
+    "embeddings-openai:mlflow50:50"
+    "direct-embeddings-openai:mlflow50:50"
+  )
+fi
+
 echo "=== Release baseline capture: $VERSION ($REPEATS repeats x $DURATION) -> $OUTDIR ==="
 echo "=== Absolute SLO config: $SLO_CONFIG_FILE ==="
+echo "=== INCLUDE_MLFLOW50_TRACK: $INCLUDE_MLFLOW50_TRACK ==="
 for entry in "${SCENARIOS[@]}"; do
   IFS=':' read -r scenario fixture load <<< "$entry"
   if [[ -z "${load:-}" ]]; then
