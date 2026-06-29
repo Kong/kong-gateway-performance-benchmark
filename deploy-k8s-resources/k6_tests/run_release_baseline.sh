@@ -18,10 +18,22 @@ cd "$SCRIPT_DIR"
 VERSION="${VERSION:-unknown}"
 REPEATS="${REPEATS:-3}"
 DURATION="${DURATION:-3m}"
+GATES_FILE="${RELEASE_GATES_PATH:-$SCRIPT_DIR/release_gates.yaml}"
+SLO_CONFIG_FILE="${SLO_CONFIG_PATH:-$SCRIPT_DIR/benchmark_config.yaml}"
 CAPTURED_AT="${CAPTURED_AT:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}"
 DATESTAMP="$(date -u +"%Y-%m-%d")"
 OUTDIR="results/releases/${VERSION}_${DATESTAMP}"
 mkdir -p "$OUTDIR"
+
+if [ ! -f "$GATES_FILE" ]; then
+  echo "ERROR: gates file not found: $GATES_FILE" >&2
+  exit 2
+fi
+
+if [ ! -f "$SLO_CONFIG_FILE" ]; then
+  echo "ERROR: SLO config file not found: $SLO_CONFIG_FILE" >&2
+  exit 2
+fi
 
 # Standard load profile (scenario : load). Streaming scenarios are VUs; the rest
 # are request rate. Kept moderate so the cluster stays in steady state (low CV).
@@ -39,12 +51,19 @@ SCENARIOS=(
 )
 
 echo "=== Release baseline capture: $VERSION ($REPEATS repeats x $DURATION) -> $OUTDIR ==="
+echo "=== Absolute SLO config: $SLO_CONFIG_FILE ==="
 for entry in "${SCENARIOS[@]}"; do
   scenario="${entry%%:*}"; load="${entry##*:}"
   for r in $(seq 1 "$REPEATS"); do
     echo "--- $scenario  repeat $r/$REPEATS  (load=$load, $DURATION) ---"
-    kubectl delete testrun -n k6 --all --ignore-not-found >/dev/null 2>&1; sleep 4
-    bash run_ai_benchmark.sh "$scenario" short "$load" "$DURATION" >/dev/null 2>&1
+    run_driver_log="$OUTDIR/${scenario}__run${r}.driver.log"
+    {
+      echo "[driver] deleting previous testruns"
+      kubectl delete testrun -n k6 --all --ignore-not-found
+      sleep 4
+      echo "[driver] running scenario=$scenario fixture=short load=$load duration=$DURATION"
+      bash run_ai_benchmark.sh "$scenario" short "$load" "$DURATION"
+    } >"$run_driver_log" 2>&1
     # wait for the runner pod to finish
     rp=""
     for i in $(seq 1 80); do
@@ -69,13 +88,14 @@ python3 aggregate_release.py --dir "$OUTDIR" --version "$VERSION" --captured-at 
 BASELINE_PTR="results/releases/baseline.json"
 if [ -f "$BASELINE_PTR" ]; then
   BASE_DIR=$(python3 -c "import json;print(json.load(open('$BASELINE_PTR'))['dir'])")
-  echo "=== comparing vs baseline $BASE_DIR ==="
+  echo "=== comparing vs baseline $BASE_DIR (gates: $GATES_FILE) ==="
   python3 compare_release.py --current "$OUTDIR" --baseline "$BASE_DIR" \
-    --out "$OUTDIR/report.md" --json "$OUTDIR/verdict.json"
+    --gates "$GATES_FILE" --slo-config "$SLO_CONFIG_FILE" --out "$OUTDIR/report.md" --json "$OUTDIR/verdict.json"
   echo "verdict exit: $?"
 else
-  echo "=== no baseline yet — recording $OUTDIR as the reference baseline ==="
-  python3 compare_release.py --current "$OUTDIR" --out "$OUTDIR/report.md" --json "$OUTDIR/verdict.json"
+  echo "=== no baseline yet — recording $OUTDIR as the reference baseline (gates: $GATES_FILE) ==="
+  python3 compare_release.py --current "$OUTDIR" --gates "$GATES_FILE" \
+    --slo-config "$SLO_CONFIG_FILE" --out "$OUTDIR/report.md" --json "$OUTDIR/verdict.json"
   printf '{"dir": "%s", "version": "%s"}\n' "$OUTDIR" "$VERSION" > "$BASELINE_PTR"
   echo "baseline.json -> $OUTDIR"
 fi

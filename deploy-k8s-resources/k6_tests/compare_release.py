@@ -36,6 +36,93 @@ import yaml
 LATENCY_METRICS = ["p95_ms", "p99_ms", "ttft_p95_ms"]
 
 
+def load_slo_config(path_str):
+    p = Path(path_str)
+    if not p.exists():
+        return {}
+    with open(p) as f:
+        return yaml.safe_load(f) or {}
+
+
+def scenario_slo_thresholds(slo_cfg, scenario):
+    base = slo_cfg.get("slo", {})
+    overrides = slo_cfg.get("scenarios", {}).get(scenario, {})
+
+    thresholds = {
+        "max_error_rate_percent": base.get("max_error_rate_percent", 1.0),
+        "min_checks_pass_rate_percent": base.get("min_checks_pass_rate_percent", 99.0),
+        "max_p95_latency_ms": base.get("max_p95_latency_ms", 500),
+        "max_p99_latency_ms": base.get("max_p99_latency_ms", 1000),
+    }
+
+    if "max_p95_latency_ms" in overrides:
+        thresholds["max_p95_latency_ms"] = overrides["max_p95_latency_ms"]
+    if "max_p99_latency_ms" in overrides:
+        thresholds["max_p99_latency_ms"] = overrides["max_p99_latency_ms"]
+    if "max_ttft_p95_ms" in overrides:
+        thresholds["max_ttft_p95_ms"] = overrides["max_ttft_p95_ms"]
+
+    return thresholds
+
+
+def evaluate_absolute_slo(cur_metrics, slo_cfg):
+    violations = []
+    for scenario, metric_set in cur_metrics.get("scenarios", {}).items():
+        th = scenario_slo_thresholds(slo_cfg, scenario)
+
+        error_rate = metric_set.get("error_rate_pct")
+        if error_rate is not None and error_rate > th["max_error_rate_percent"]:
+            violations.append({
+                "scenario": scenario,
+                "metric": "error_rate_pct",
+                "actual": error_rate,
+                "threshold": th["max_error_rate_percent"],
+                "detail": f"error rate {error_rate:.2f}% exceeds {th['max_error_rate_percent']:.2f}%",
+            })
+
+        checks_pass = metric_set.get("checks_pass_pct")
+        if checks_pass is not None and checks_pass < th["min_checks_pass_rate_percent"]:
+            violations.append({
+                "scenario": scenario,
+                "metric": "checks_pass_pct",
+                "actual": checks_pass,
+                "threshold": th["min_checks_pass_rate_percent"],
+                "detail": f"checks pass {checks_pass:.2f}% below {th['min_checks_pass_rate_percent']:.2f}%",
+            })
+
+        p95 = metric_set.get("p95_ms")
+        if p95 is not None and p95 > th["max_p95_latency_ms"]:
+            violations.append({
+                "scenario": scenario,
+                "metric": "p95_ms",
+                "actual": p95,
+                "threshold": th["max_p95_latency_ms"],
+                "detail": f"p95 {p95:.2f}ms exceeds {th['max_p95_latency_ms']:.2f}ms",
+            })
+
+        p99 = metric_set.get("p99_ms")
+        if p99 is not None and p99 > th["max_p99_latency_ms"]:
+            violations.append({
+                "scenario": scenario,
+                "metric": "p99_ms",
+                "actual": p99,
+                "threshold": th["max_p99_latency_ms"],
+                "detail": f"p99 {p99:.2f}ms exceeds {th['max_p99_latency_ms']:.2f}ms",
+            })
+
+        ttft = metric_set.get("ttft_p95_ms")
+        if ttft is not None and "max_ttft_p95_ms" in th and ttft > th["max_ttft_p95_ms"]:
+            violations.append({
+                "scenario": scenario,
+                "metric": "ttft_p95_ms",
+                "actual": ttft,
+                "threshold": th["max_ttft_p95_ms"],
+                "detail": f"ttft p95 {ttft:.2f}ms exceeds {th['max_ttft_p95_ms']:.2f}ms",
+            })
+
+    return violations
+
+
 def load_metrics(path_str):
     p = Path(path_str)
     if p.is_dir():
@@ -103,12 +190,15 @@ def main():
     ap.add_argument("--current", required=True)
     ap.add_argument("--baseline", default=None)
     ap.add_argument("--gates", default=str(Path(__file__).parent / "release_gates.yaml"))
+    ap.add_argument("--slo-config", default=str(Path(__file__).parent / "benchmark_config.yaml"))
     ap.add_argument("--out", default=None, help="markdown report path")
     ap.add_argument("--json", default=None, help="machine-readable verdict path")
     args = ap.parse_args()
 
     cur = load_metrics(args.current)
     gates = yaml.safe_load(open(args.gates))
+    slo_cfg = load_slo_config(args.slo_config)
+    absolute_slo_violations = evaluate_absolute_slo(cur, slo_cfg)
     noise_floor = gates.get("noise_floor", {})
     metrics = ["p95_ms", "p99_ms", "ttft_p95_ms", "throughput_rps", "error_rate_pct"]
 
@@ -124,13 +214,28 @@ def main():
             lines.append(f"| {s} | {m.get('p95_ms','-')} | {m.get('p99_ms','-')} | "
                          f"{m.get('ttft_p95_ms') or '-'} | {m.get('throughput_rps','-')} | "
                          f"{m.get('error_rate_pct','-')} | {m.get('repeats','-')} |")
+
+        if absolute_slo_violations:
+            lines += ["", "## Absolute SLO Violations", ""]
+            for v in absolute_slo_violations:
+                lines.append(
+                    f"- `{v['scenario']}` / **{v['metric']}**: {v['detail']}"
+                )
+            lines += ["", "## Overall: ABSOLUTE_SLO_FAIL", ""]
+        else:
+            lines += ["", "## Overall: BASELINE_PASS", ""]
+
         report = "\n".join(lines) + "\n"
         if args.out:
             Path(args.out).write_text(report)
         print(report)
         if args.json:
-            Path(args.json).write_text(json.dumps({"verdict": "BASELINE", "regressions": []}, indent=2))
-        return 0
+            Path(args.json).write_text(json.dumps({
+                "verdict": "ABSOLUTE_SLO_FAIL" if absolute_slo_violations else "BASELINE_PASS",
+                "regressions": [],
+                "absolute_slo_violations": absolute_slo_violations,
+            }, indent=2))
+        return 1 if absolute_slo_violations else 0
 
     base = load_metrics(args.baseline)
     lines.append(f"**Baseline:** {base.get('version','?')} ({base.get('captured_at','?')})")
@@ -175,6 +280,8 @@ def main():
 
     overall = "REGRESSION" if regressions else ("UNSTABLE" if unstable else
               ("WARN" if warnings else "PASS"))
+    if absolute_slo_violations:
+        overall = "ABSOLUTE_SLO_FAIL"
     lines += ["", f"## Overall: {overall}", ""]
     if regressions:
         lines.append(f"**{len(regressions)} regression(s) — escalate to dev team:**")
@@ -185,6 +292,11 @@ def main():
                      + ", ".join(f"{s} (CV {cv:.1f}%)" for s, cv in unstable))
     if warnings and not regressions:
         lines.append(f"\n{len(warnings)} warning(s) — monitor, no action required.")
+
+    if absolute_slo_violations:
+        lines += ["", f"**{len(absolute_slo_violations)} absolute SLO violation(s):**"]
+        for v in absolute_slo_violations:
+            lines.append(f"- `{v['scenario']}` / **{v['metric']}**: {v['detail']}")
 
     report = "\n".join(lines) + "\n"
     if args.out:
@@ -198,10 +310,11 @@ def main():
                             for s, m, ds, d in regressions],
             "warnings": [{"scenario": s, "metric": m, "delta": ds} for s, m, ds, _ in warnings],
             "unstable": [{"scenario": s, "cv_pct": cv} for s, cv in unstable],
+            "absolute_slo_violations": absolute_slo_violations,
         }, indent=2))
 
-    # exit non-zero on regression OR unstable so CI gates / surfaces it
-    return 1 if (regressions or unstable) else 0
+    # exit non-zero on absolute SLO failures, regression, or unstable runs.
+    return 1 if (absolute_slo_violations or regressions or unstable) else 0
 
 
 if __name__ == "__main__":
