@@ -36,6 +36,15 @@ import yaml
 LATENCY_METRICS = ["p95_ms", "p99_ms", "ttft_p95_ms"]
 
 
+def base_scenario_name(scenario):
+    return str(scenario).split("__", 1)[0]
+
+
+def scenario_fixture_suffix(scenario):
+    parts = str(scenario).split("__", 1)
+    return f"__{parts[1]}" if len(parts) == 2 else ""
+
+
 def load_slo_config(path_str):
     p = Path(path_str)
     if not p.exists():
@@ -45,6 +54,7 @@ def load_slo_config(path_str):
 
 
 def scenario_slo_thresholds(slo_cfg, scenario):
+    scenario = base_scenario_name(scenario)
     base = slo_cfg.get("slo", {})
     overrides = slo_cfg.get("scenarios", {}).get(scenario, {})
 
@@ -132,9 +142,65 @@ def load_metrics(path_str):
 
 
 def gate_for(gates, scenario, metric):
+    scenario = base_scenario_name(scenario)
     g = dict(gates.get("defaults", {}).get(metric, {}))
     g.update(gates.get("scenarios", {}).get(scenario, {}).get(metric, {}))
     return g
+
+
+def estimate_gateway_overhead(cur_metrics):
+    scenarios = cur_metrics.get("scenarios", {})
+    pairs = [
+        ("token-chat-openai", "direct-token-chat-openai"),
+        ("embeddings-openai", "direct-embeddings-openai"),
+    ]
+
+    out = []
+    for gateway_scenario, direct_scenario in pairs:
+        for key, gateway_metrics in scenarios.items():
+            if not key.startswith(gateway_scenario):
+                continue
+            suffix = scenario_fixture_suffix(key)
+            direct_key = f"{direct_scenario}{suffix}"
+            direct_metrics = scenarios.get(direct_key)
+            if not direct_metrics:
+                continue
+
+            p95_gw = gateway_metrics.get("p95_ms")
+            p95_direct = direct_metrics.get("p95_ms")
+            p99_gw = gateway_metrics.get("p99_ms")
+            p99_direct = direct_metrics.get("p99_ms")
+
+            if p95_gw is None or p95_direct is None:
+                continue
+
+            fixture = suffix[2:] if suffix else "short"
+            p95_delta = round(p95_gw - p95_direct, 3)
+            p99_delta = round((p99_gw - p99_direct), 3) if (p99_gw is not None and p99_direct is not None) else None
+            out.append({
+                "scenario": gateway_scenario,
+                "fixture": fixture,
+                "gateway_scenario_key": key,
+                "direct_scenario_key": direct_key,
+                "p95_gateway_ms": p95_gw,
+                "p95_direct_ms": p95_direct,
+                "p95_delta_ms": p95_delta,
+                "p99_delta_ms": p99_delta,
+            })
+
+    return out
+
+
+def append_not_measured(lines):
+    lines += [
+        "",
+        "## Not Measured",
+        "",
+        "- Real provider latency variance (mock upstream returns synthetic deterministic responses).",
+        "- Public internet path distance and external provider network conditions.",
+        "- End-to-end model generation behavior beyond configured mock timing.",
+        "- Full auth/RBAC business-flow impact unless explicitly covered by policy scenarios.",
+    ]
 
 
 def classify(metric, cur, base, gate, noise_floor):
@@ -199,6 +265,7 @@ def main():
     gates = yaml.safe_load(open(args.gates))
     slo_cfg = load_slo_config(args.slo_config)
     absolute_slo_violations = evaluate_absolute_slo(cur, slo_cfg)
+    gateway_overhead_estimates = estimate_gateway_overhead(cur)
     noise_floor = gates.get("noise_floor", {})
     metrics = ["p95_ms", "p99_ms", "ttft_p95_ms", "throughput_rps", "error_rate_pct"]
 
@@ -225,6 +292,19 @@ def main():
         else:
             lines += ["", "## Overall: BASELINE_PASS", ""]
 
+        if gateway_overhead_estimates:
+            lines += ["", "## Estimated Gateway Overhead (Gateway - Direct Upstream)", ""]
+            lines.append("| Scenario | Fixture | p95 gateway (ms) | p95 direct (ms) | p95 delta (ms) | p99 delta (ms) |")
+            lines.append("|---|---|---|---|---|---|")
+            for row in gateway_overhead_estimates:
+                p99_delta = "-" if row["p99_delta_ms"] is None else f"{row['p99_delta_ms']:.3f}"
+                lines.append(
+                    f"| {row['scenario']} | {row['fixture']} | {row['p95_gateway_ms']:.3f} | "
+                    f"{row['p95_direct_ms']:.3f} | {row['p95_delta_ms']:.3f} | {p99_delta} |"
+                )
+
+        append_not_measured(lines)
+
         report = "\n".join(lines) + "\n"
         if args.out:
             Path(args.out).write_text(report)
@@ -234,6 +314,7 @@ def main():
                 "verdict": "ABSOLUTE_SLO_FAIL" if absolute_slo_violations else "BASELINE_PASS",
                 "regressions": [],
                 "absolute_slo_violations": absolute_slo_violations,
+                "gateway_overhead_estimates": gateway_overhead_estimates,
             }, indent=2))
         return 1 if absolute_slo_violations else 0
 
@@ -298,6 +379,19 @@ def main():
         for v in absolute_slo_violations:
             lines.append(f"- `{v['scenario']}` / **{v['metric']}**: {v['detail']}")
 
+    if gateway_overhead_estimates:
+        lines += ["", "## Estimated Gateway Overhead (Gateway - Direct Upstream)", ""]
+        lines.append("| Scenario | Fixture | p95 gateway (ms) | p95 direct (ms) | p95 delta (ms) | p99 delta (ms) |")
+        lines.append("|---|---|---|---|---|---|")
+        for row in gateway_overhead_estimates:
+            p99_delta = "-" if row["p99_delta_ms"] is None else f"{row['p99_delta_ms']:.3f}"
+            lines.append(
+                f"| {row['scenario']} | {row['fixture']} | {row['p95_gateway_ms']:.3f} | "
+                f"{row['p95_direct_ms']:.3f} | {row['p95_delta_ms']:.3f} | {p99_delta} |"
+            )
+
+    append_not_measured(lines)
+
     report = "\n".join(lines) + "\n"
     if args.out:
         Path(args.out).write_text(report)
@@ -311,6 +405,7 @@ def main():
             "warnings": [{"scenario": s, "metric": m, "delta": ds} for s, m, ds, _ in warnings],
             "unstable": [{"scenario": s, "cv_pct": cv} for s, cv in unstable],
             "absolute_slo_violations": absolute_slo_violations,
+            "gateway_overhead_estimates": gateway_overhead_estimates,
         }, indent=2))
 
     # exit non-zero on absolute SLO failures, regression, or unstable runs.

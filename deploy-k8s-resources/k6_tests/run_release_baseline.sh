@@ -35,34 +35,50 @@ if [ ! -f "$SLO_CONFIG_FILE" ]; then
   exit 2
 fi
 
-# Standard load profile (scenario : load). Streaming scenarios are VUs; the rest
-# are request rate. Kept moderate so the cluster stays in steady state (low CV).
+# Standard release matrix: scenario:fixture:load.
+# Streaming loads are VUs; others are request rate.
 SCENARIOS=(
-  "static-chat:50"
-  "token-chat-openai:50"
-  "stream-openai:30"
-  "stream-gemini:30"
-  "embeddings-openai:50"
-  "routing-roundrobin-2:25"
-  "routing-roundrobin-10:25"
-  "routing-ewma:25"
-  "routing-failover:25"
-  "payload-logging:25"
+  "static-chat:short:50"
+  "token-chat-openai:short:50"
+  "token-chat-openai:medium:50"
+  "direct-token-chat-openai:short:50"
+  "direct-token-chat-openai:medium:50"
+  "stream-openai:short:30"
+  "stream-gemini:short:30"
+  "embeddings-openai:short:50"
+  "embeddings-openai:medium:50"
+  "direct-embeddings-openai:short:50"
+  "direct-embeddings-openai:medium:50"
+  "routing-roundrobin-2:short:25"
+  "routing-roundrobin-10:short:25"
+  "routing-ewma:short:25"
+  "routing-failover:short:25"
+  "payload-logging:short:25"
 )
 
 echo "=== Release baseline capture: $VERSION ($REPEATS repeats x $DURATION) -> $OUTDIR ==="
 echo "=== Absolute SLO config: $SLO_CONFIG_FILE ==="
 for entry in "${SCENARIOS[@]}"; do
-  scenario="${entry%%:*}"; load="${entry##*:}"
+  IFS=':' read -r scenario fixture load <<< "$entry"
+  if [[ -z "${load:-}" ]]; then
+    load="$fixture"
+    fixture="short"
+  fi
+
+  scenario_key="$scenario"
+  if [[ "$fixture" != "short" ]]; then
+    scenario_key="${scenario}__${fixture}"
+  fi
+
   for r in $(seq 1 "$REPEATS"); do
-    echo "--- $scenario  repeat $r/$REPEATS  (load=$load, $DURATION) ---"
-    run_driver_log="$OUTDIR/${scenario}__run${r}.driver.log"
+    echo "--- $scenario ($fixture) repeat $r/$REPEATS  (load=$load, $DURATION) ---"
+    run_driver_log="$OUTDIR/${scenario_key}__run${r}.driver.log"
     {
       echo "[driver] deleting previous testruns"
       kubectl delete testrun -n k6 --all --ignore-not-found
       sleep 4
-      echo "[driver] running scenario=$scenario fixture=short load=$load duration=$DURATION"
-      bash run_ai_benchmark.sh "$scenario" short "$load" "$DURATION"
+      echo "[driver] running scenario=$scenario fixture=$fixture load=$load duration=$DURATION"
+      bash run_ai_benchmark.sh "$scenario" "$fixture" "$load" "$DURATION"
     } >"$run_driver_log" 2>&1
     # wait for the runner pod to finish
     rp=""
@@ -76,8 +92,8 @@ for entry in "${SCENARIOS[@]}"; do
     # save this repeat's summary
     kubectl logs -n k6 "$rp" 2>/dev/null | \
       grep -E "AI benchmark summary|http_req_duration p9|http_reqs/s|http_req_failed|checks pass|ai_time_to_first_token_ms p95" \
-      > "$OUTDIR/${scenario}__run${r}.log"
-    echo "    saved $OUTDIR/${scenario}__run${r}.log (phase=$ph)"
+      > "$OUTDIR/${scenario_key}__run${r}.log"
+    echo "    saved $OUTDIR/${scenario_key}__run${r}.log (phase=$ph)"
   done
 done
 

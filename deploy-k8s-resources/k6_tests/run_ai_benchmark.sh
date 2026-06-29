@@ -8,18 +8,22 @@ Usage:
   ./run_ai_benchmark.sh <scenario> [fixture] [load] [duration]
 
 Load semantics:
-  - static-chat, token-chat-openai, embeddings-openai, policy-*:
+  - static-chat, token-chat-openai, direct-token-chat-openai,
+    embeddings-openai, direct-embeddings-openai, policy-*:
       load = target request rate in requests/second (RPS)
-  - stream-openai, stream-gemini:
+  - stream-openai, direct-stream-openai, stream-gemini:
       load = target constant concurrent virtual users (VUs), which represent
       active streaming sessions
 
 Scenarios:
   static-chat          WireMock fixed-response comparison
   token-chat-openai    Non-streaming OpenAI-style token benchmark
+  direct-token-chat-openai  Direct fake_provider OpenAI chat (gateway bypass)
   stream-openai        Streaming OpenAI-style token benchmark
+  direct-stream-openai Direct fake_provider OpenAI stream (gateway bypass)
   stream-gemini        Streaming Gemini-style token benchmark
   embeddings-openai    OpenAI-style embeddings benchmark
+  direct-embeddings-openai  Direct fake_provider embeddings (gateway bypass)
   policy-auth-openai   Key-auth overhead benchmark
   policy-rate-limit    Request rate limiting overhead benchmark
   policy-token-budget  AI token budget overhead benchmark
@@ -147,9 +151,29 @@ case "$SCENARIO" in
     K6_AI_STREAM_VUS=25
     LOAD_KIND="rps"
     ;;
+  direct-token-chat-openai)
+    SCRIPT_FILE="k6_ai_token_chat.js"
+    K6_AI_CHAT_URL="http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions"
+    K6_AI_RATE=${LOAD:-25}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    K6_AI_STREAM_VUS=25
+    LOAD_KIND="rps"
+    ;;
   stream-openai)
     SCRIPT_FILE="k6_ai_stream_openai.js"
     K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/token/stream/openai"
+    K6_AI_RATE=25
+    K6_AI_STREAM_VUS=${LOAD:-30}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    LOAD_KIND="vus"
+    ;;
+  direct-stream-openai)
+    SCRIPT_FILE="k6_ai_stream_openai.js"
+    K6_AI_CHAT_URL="http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions"
     K6_AI_RATE=25
     K6_AI_STREAM_VUS=${LOAD:-30}
     K6_AI_DURATION=${DURATION:-6m}
@@ -170,6 +194,16 @@ case "$SCENARIO" in
   embeddings-openai)
     SCRIPT_FILE="k6_ai_embeddings.js"
     K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/token/embeddings/openai"
+    K6_AI_RATE=${LOAD:-40}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    K6_AI_STREAM_VUS=25
+    LOAD_KIND="rps"
+    ;;
+  direct-embeddings-openai)
+    SCRIPT_FILE="k6_ai_embeddings.js"
+    K6_AI_CHAT_URL="http://fake-provider.upstream.svc.cluster.local:8080/v1/embeddings"
     K6_AI_RATE=${LOAD:-40}
     K6_AI_DURATION=${DURATION:-6m}
     K6_AI_PRE_ALLOCATED_VUS=50
