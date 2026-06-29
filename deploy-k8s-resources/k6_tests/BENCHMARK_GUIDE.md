@@ -33,6 +33,13 @@ GATEWAYS=kong,litellm ./run_gateway_comparison.sh token-chat-openai
 | `run_ai_benchmark.sh` | Single benchmark run |
 | `run_k6_tests.sh` | Generic k6 test runner |
 
+Direct upstream control scenarios are also available in `run_ai_benchmark.sh`
+to estimate gateway-only overhead by bypassing Kong:
+
+- `direct-token-chat-openai`
+- `direct-stream-openai`
+- `direct-embeddings-openai`
+
 ### Campaign Scripts
 
 | Script | Purpose |
@@ -147,6 +154,14 @@ Release run directories now include per-repeat driver logs for triage:
 
 - `<scenario>__runN.driver.log` — orchestrator and kubectl driver output
 - `<scenario>__runN.log` — extracted benchmark summary metrics
+
+Release report now includes an estimated gateway overhead table when direct
+control scenarios are present:
+
+- `p95 delta (ms) = p95(gateway path) - p95(direct upstream path)`
+- `p99 delta (ms) = p99(gateway path) - p99(direct upstream path)`
+
+This gives a practical approximation of gateway-only latency contribution.
 
 ## Multi-Gateway Comparison
 

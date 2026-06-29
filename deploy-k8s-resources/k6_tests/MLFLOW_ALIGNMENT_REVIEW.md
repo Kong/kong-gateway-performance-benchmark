@@ -48,6 +48,6 @@ This document reviews the Kong AI Gateway benchmark suite against the methodolog
 - [x] Add absolute SLO gate to release comparator
 - [x] Wire absolute SLO gate into release baseline script
 - [x] Preserve per-run driver logs in release output
-- [ ] Add direct-upstream overhead scenario pair
+- [x] Add direct-upstream overhead scenario pair
 - [ ] Add robust statistics (median/IQR/CI)
-- [ ] Expand release fixture matrix
+- [x] Expand release fixture matrix
