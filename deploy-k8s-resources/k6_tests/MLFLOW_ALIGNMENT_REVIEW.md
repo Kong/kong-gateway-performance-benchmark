@@ -49,5 +49,6 @@ This document reviews the Kong AI Gateway benchmark suite against the methodolog
 - [x] Wire absolute SLO gate into release baseline script
 - [x] Preserve per-run driver logs in release output
 - [x] Add direct-upstream overhead scenario pair
+- [x] Add mlflow50 fixed-delay release track (gateway/direct pairs)
 - [ ] Add robust statistics (median/IQR/CI)
 - [x] Expand release fixture matrix

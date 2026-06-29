@@ -92,6 +92,24 @@ gateways:
 | `STRICT_GATES` | `true` | Fail build on SLO violations |
 | `SKIP_EKS_ISOLATION_CHECK` | `false` | Skip node role isolation checks |
 
+For MLflow-style overhead measurements, use the fake upstream `mlflow50`
+latency profile and `mlflow50` fixture tier:
+
+```bash
+# fake_provider profile (fixed-delay style)
+export FAKE_PROVIDER_LATENCY_PROFILE=mlflow50
+
+# benchmark fixture profile
+./run_ai_benchmark.sh token-chat-openai mlflow50 50 6m
+./run_ai_benchmark.sh direct-token-chat-openai mlflow50 50 6m
+```
+
+`mlflow50` profile behavior:
+
+- chat/stream default TTFT: 50ms
+- chat/stream default TPOT: 0ms
+- embeddings delay mode defaults to TTFT (50ms)
+
 ## Preflight Check
 
 Validates environment before running benchmarks:
@@ -148,6 +166,10 @@ scenario exceeds absolute limits (for example scenario `max_ttft_p95_ms`).
 ```bash
 # Override absolute SLO config path when needed
 SLO_CONFIG_PATH=./benchmark_config.yaml ./run_release_baseline.sh
+
+# Include/exclude MLflow fixed-delay track in release matrix
+INCLUDE_MLFLOW50_TRACK=true ./run_release_baseline.sh
+INCLUDE_MLFLOW50_TRACK=false ./run_release_baseline.sh
 ```
 
 Release run directories now include per-repeat driver logs for triage:
@@ -162,6 +184,10 @@ control scenarios are present:
 - `p99 delta (ms) = p99(gateway path) - p99(direct upstream path)`
 
 This gives a practical approximation of gateway-only latency contribution.
+
+When `INCLUDE_MLFLOW50_TRACK=true`, the release matrix also runs
+`mlflow50` fixture pairs for gateway and direct-upstream paths so the overhead
+table can be interpreted under fixed-delay upstream assumptions.
 
 ## Multi-Gateway Comparison
 
