@@ -1,7 +1,0 @@
-AI benchmark summary: stream openai (short)
-http_reqs/s: 22.63
-http_req_duration p95(ms): 1326.67265585
-http_req_duration p99(ms): 1329.52201767
-http_req_failed(%): 0.00
-checks pass rate(%): 100.00
-ai_time_to_first_token_ms p95: 524.10155995

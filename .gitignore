@@ -35,6 +35,5 @@ terraform.rc
 license.json
 **/license.json
 
-# Benchmark results (generated, ad-hoc) — but keep tracked release baselines
-**/results/*
-!**/results/releases/
+# Benchmark results (generated)
+**/results/
