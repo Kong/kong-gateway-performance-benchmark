@@ -2,22 +2,27 @@ name: EKS AI Gateway Benchmark
 
 # Manual trigger only — this provisions real, expensive EKS infrastructure
 # (including c5.metal nodes) and tears it down at the end of the run.
+#
+# Two modes (input `run_mode`):
+#   release (default) — full release benchmark: run_release_baseline*.sh matrix x repeats,
+#                       compare against a previous run's artifact, generate PDF report.
+#   adhoc             — the original behaviour: run only the scenarios listed in `scenarios`.
 on:
   workflow_dispatch:
     inputs:
-      scenarios:
-        description: >-
-          Space-separated benchmark invocations, one per line is also fine.
-          Each entry is passed verbatim to run_ai_benchmark.sh.
-          Example: "token-chat-openai short 25 6m"
-        type: string
-        default: "token-chat-openai short 5 1m"
+      run_mode:
+        description: "release = full matrix + compare + PDF report; adhoc = only the scenarios listed below"
+        type: choice
+        options:
+          - release
+          - adhoc
+        default: release
       kong_repository:
         description: "Kong image repository"
         type: string
         default: "kong/kong-ai-gateway-dev"
       kong_version:
-        description: "Kong image tag"
+        description: "Kong image tag (e.g. 2.3.0-rc.2)"
         type: string
         default: "ai-2.0.0-rc.2"
       kong_effective_semver:
@@ -32,6 +37,49 @@ on:
         description: "Run terraform destroy after the benchmark (uncheck to keep the cluster for inspection)"
         type: boolean
         default: true
+      # ---- release mode only ----
+      release_label:
+        description: "[release] Version label used for the results dir / report. Blank = ai-<kong_version>."
+        type: string
+        default: ""
+      repeats:
+        description: "[release] Repeats per scenario. 6 does NOT fit in the 6h hosted-runner limit (see runtime check)."
+        type: string
+        default: "3"
+      duration:
+        description: "[release] Duration per run, whole minutes, e.g. 3m"
+        type: string
+        default: "3m"
+      include_mlflow50_track:
+        description: "[release] Include the mlflow50 fixed-delay track (6 extra scenarios)"
+        type: boolean
+        default: true
+      gates_profile:
+        description: "[release] Regression gate profile"
+        type: choice
+        options:
+          - non_dedicated
+          - default
+        default: non_dedicated
+      baseline_run_id:
+        description: "[release] Run ID of a previous release-mode run whose `release-results` artifact is the baseline. Blank = no comparison (this run becomes the reference)."
+        type: string
+        default: ""
+      fail_on_regression:
+        description: "[release] Fail the job if the verdict is REGRESSION / UNSTABLE / ABSOLUTE_SLO_FAIL"
+        type: boolean
+        default: false
+      ignore_runtime_estimate:
+        description: "[release] Do not abort when the estimated runtime exceeds the 6h job limit"
+        type: boolean
+        default: false
+      # ---- adhoc mode only ----
+      scenarios:
+        description: >-
+          [adhoc] One benchmark invocation per line, passed verbatim to run_ai_benchmark.sh.
+          Example: "token-chat-openai short 25 6m"
+        type: string
+        default: "token-chat-openai short 5 1m"
 
 # Only one benchmark run at a time — they share IAM role names and would collide.
 concurrency:
@@ -40,12 +88,13 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read # needed to download the baseline artifact of a previous run
 
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    # Cluster create (~20m) + deploy (~10m) + tests + teardown. Give it plenty of room.
-    timeout-minutes: 300
+    # Cluster create (~20m) + deploy (~10m) + tests + teardown. 360m is the hosted-runner maximum.
+    timeout-minutes: 360
     env:
       AWS_DEFAULT_REGION: ${{ inputs.region }}
       TF_VAR_region: ${{ inputs.region }}
@@ -56,6 +105,35 @@ jobs:
       TF_IN_AUTOMATION: "true"
 
     steps:
+      # Validate release-mode inputs BEFORE spending money on a cluster. Inputs are
+      # passed through env vars (never interpolated into the script) and strictly checked.
+      - name: Validate inputs
+        if: inputs.run_mode == 'release'
+        env:
+          REPEATS: ${{ inputs.repeats }}
+          DURATION: ${{ inputs.duration }}
+          MLFLOW: ${{ inputs.include_mlflow50_track }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          RELEASE_LABEL: ${{ inputs.release_label }}
+          IGNORE_EST: ${{ inputs.ignore_runtime_estimate }}
+        run: |
+          set -euo pipefail
+          [[ "$REPEATS" =~ ^[1-9][0-9]*$ ]] || { echo "::error::repeats must be a positive integer"; exit 1; }
+          [[ "$DURATION" =~ ^[1-9][0-9]*m$ ]] || { echo "::error::duration must be whole minutes like 3m"; exit 1; }
+          [[ -z "$BASELINE_RUN_ID" || "$BASELINE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::baseline_run_id must be numeric"; exit 1; }
+          [[ -z "$RELEASE_LABEL" || "$RELEASE_LABEL" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::release_label may only contain [A-Za-z0-9._-]"; exit 1; }
+
+          scenarios=16; [ "$MLFLOW" = "true" ] && scenarios=22
+          dur=${DURATION%m}
+          # ~1 min of per-run overhead (testrun cleanup, pod start, log collection) + ~40 min cluster create/deploy/destroy
+          est=$(( scenarios * REPEATS * (dur + 1) + 40 ))
+          echo "Estimated runtime: ${est} min (${scenarios} scenarios x ${REPEATS} repeats x (${dur}m + 1m) + 40m); job limit 360 min"
+          echo "### Runtime estimate: ${est} min (limit 360)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$est" -gt 345 ] && [ "$IGNORE_EST" != "true" ]; then
+            echo "::error::Estimated ${est} min exceeds the 360 min hosted-runner limit. Lower repeats/duration, disable the mlflow50 track, or set ignore_runtime_estimate."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -83,6 +161,14 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
           yq --version
+
+      # Python deps for compare_release.py (pyyaml) and generate_perf_report.py (PDF).
+      - name: Setup Python report dependencies
+        if: inputs.run_mode == 'release'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0
+          python3 -m pip install --quiet pyyaml matplotlib numpy weasyprint
 
       # ---------- Phase 1: provision EKS cluster ----------
       - name: Terraform apply — EKS cluster
@@ -132,8 +218,9 @@ jobs:
             [ -f "$f" ] && kubectl apply -f "$f" || echo "skip missing $f"
           done
 
-      # ---------- Phase 4: run benchmarks ----------
+      # ---------- Phase 4a (adhoc): run the listed scenarios ----------
       - name: Run benchmark scenarios
+        if: inputs.run_mode == 'adhoc'
         working-directory: deploy-k8s-resources/k6_tests
         env:
           KONG_VERSION: ${{ inputs.kong_version }}
@@ -151,8 +238,79 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Collect results
-        if: always()
+      # ---------- Phase 4b (release): full matrix, compare, PDF ----------
+      - name: Fetch baseline from previous run
+        if: inputs.run_mode == 'release' && inputs.baseline_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+        run: |
+          set -euo pipefail
+          dl=$(mktemp -d)
+          gh run download "$BASELINE_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-results -D "$dl"
+          metrics=$(find "$dl" -name metrics.json | head -1)
+          [ -n "$metrics" ] || { echo "::error::no metrics.json in baseline artifact of run $BASELINE_RUN_ID"; exit 1; }
+          src=$(dirname "$metrics")
+          name="baseline-ref_$(basename "$src")"
+          dest="deploy-k8s-resources/k6_tests/results/releases/$name"
+          mkdir -p "$dest"
+          cp -r "$src"/. "$dest"/
+          version=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$dest/metrics.json")
+          # run_release_baseline.sh auto-diffs against whatever baseline.json points at.
+          printf '{"dir": "results/releases/%s", "version": "%s"}\n' "$name" "$version" \
+            > deploy-k8s-resources/k6_tests/results/releases/baseline.json
+          echo "Baseline: $name (version $version)"
+          echo "### Baseline: \`$version\` (run $BASELINE_RUN_ID)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run release benchmark matrix
+        if: inputs.run_mode == 'release'
+        working-directory: deploy-k8s-resources/k6_tests
+        env:
+          KONG_VERSION_TAG: ${{ inputs.kong_version }}
+          RELEASE_LABEL: ${{ inputs.release_label }}
+          REPEATS: ${{ inputs.repeats }}
+          DURATION: ${{ inputs.duration }}
+          INCLUDE_MLFLOW50_TRACK: ${{ inputs.include_mlflow50_track }}
+          GATES_PROFILE: ${{ inputs.gates_profile }}
+        run: |
+          set -uo pipefail
+          VERSION="${RELEASE_LABEL:-ai-${KONG_VERSION_TAG#ai-}}"
+          export VERSION REPEATS DURATION INCLUDE_MLFLOW50_TRACK
+          echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          mkdir -p results/releases
+          if [ "$GATES_PROFILE" = "non_dedicated" ]; then
+            bash run_release_baseline_non_dedicated.sh
+          else
+            bash run_release_baseline.sh
+          fi
+          # The script's own exit code only reflects the last step; the verdict is
+          # evaluated by the "Evaluate verdict" step below.
+          outdir=$(ls -dt results/releases/"${VERSION}"_* 2>/dev/null | head -1 || true)
+          [ -n "$outdir" ] && [ -f "$outdir/metrics.json" ] || { echo "::error::no results produced for $VERSION"; exit 1; }
+          echo "RELEASE_OUTDIR=$outdir" >> "$GITHUB_ENV"
+
+      - name: Generate PDF report
+        if: inputs.run_mode == 'release' && success()
+        working-directory: deploy-k8s-resources/k6_tests
+        env:
+          REPEATS: ${{ inputs.repeats }}
+          DURATION: ${{ inputs.duration }}
+          REGION: ${{ inputs.region }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          K8S_VERSION=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" --query cluster.version --output text)
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/release"
+          python3 ../../generate_perf_report.py "$RELEASE_OUTDIR" \
+            "$GITHUB_WORKSPACE/artifacts/release/kong-ai-gateway-perf-report-${RELEASE_VERSION}.pdf" \
+            --cluster-name "$CLUSTER_NAME" --k8s-version "$K8S_VERSION" --region "$REGION" \
+            --repeats "$REPEATS" --duration "$DURATION" \
+            --prepared-by "$ACTOR (GitHub Actions run $GITHUB_RUN_ID)"
+          [ -f "$RELEASE_OUTDIR/report.md" ] && cat "$RELEASE_OUTDIR/report.md" >> "$GITHUB_STEP_SUMMARY" || true
+
+      # ---------- Collect + upload ----------
+      - name: Collect results (adhoc)
+        if: always() && inputs.run_mode == 'adhoc'
         run: |
           mkdir -p artifacts
           cp -r deploy-k8s-resources/k6_tests/results artifacts/ 2>/dev/null || true
@@ -160,12 +318,31 @@ jobs:
             > artifacts/k6-logs.txt 2>/dev/null || true
           kubectl get pods -A -o wide > artifacts/pods.txt 2>/dev/null || true
 
-      - name: Upload results artifact
-        if: always()
+      - name: Upload results artifact (adhoc)
+        if: always() && inputs.run_mode == 'adhoc'
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
           path: artifacts/
+          if-no-files-found: warn
+
+      # `release-results` holds exactly one results dir (+ the PDF) so a later run can
+      # use it as its baseline via `baseline_run_id`.
+      - name: Collect results (release)
+        if: always() && inputs.run_mode == 'release'
+        run: |
+          mkdir -p artifacts/release
+          if [ -n "${RELEASE_OUTDIR:-}" ] && [ -d "deploy-k8s-resources/k6_tests/$RELEASE_OUTDIR" ]; then
+            cp -r "deploy-k8s-resources/k6_tests/$RELEASE_OUTDIR" artifacts/release/
+          fi
+          kubectl get pods -A -o wide > artifacts/release/pods.txt 2>/dev/null || true
+
+      - name: Upload results artifact (release)
+        if: always() && inputs.run_mode == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-results
+          path: artifacts/release/
           if-no-files-found: warn
 
       # ---------- Phase 5: teardown ----------
@@ -178,3 +355,25 @@ jobs:
         if: always() && inputs.teardown
         working-directory: provision-eks-cluster
         run: terraform destroy -auto-approve -input=false || true
+
+      # Last on purpose: a failing gate must not skip artifact upload or teardown.
+      - name: Evaluate verdict
+        if: inputs.run_mode == 'release' && always() && env.RELEASE_OUTDIR != ''
+        env:
+          FAIL_ON_REGRESSION: ${{ inputs.fail_on_regression }}
+        run: |
+          set -euo pipefail
+          v="deploy-k8s-resources/k6_tests/$RELEASE_OUTDIR/verdict.json"
+          [ -f "$v" ] || { echo "::warning::no verdict.json"; exit 0; }
+          overall=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("overall","N/A"))' "$v")
+          echo "Overall verdict: $overall"
+          echo "### Overall verdict: **$overall**" >> "$GITHUB_STEP_SUMMARY"
+          case "$overall" in
+            REGRESSION|UNSTABLE|ABSOLUTE_SLO_FAIL)
+              if [ "$FAIL_ON_REGRESSION" = "true" ]; then
+                echo "::error::Release verdict $overall"
+                exit 1
+              fi
+              echo "::warning::Release verdict $overall (fail_on_regression is off)"
+              ;;
+          esac
