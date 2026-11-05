@@ -27,8 +27,11 @@ What is checked
    `overhead_slo` section at all, so old config files behave as before).
 4. Stability: worst cv_pct of a scenario vs the gates file.
 5. Environment drift (informational): env.json of both runs, when present.
-6. Optional confirmation run (--confirm DIR): a REGRESSION / UNSTABLE only counts
-   when the same scenario+metric also flags in the confirmation run.
+6. Optional confirmation run (--confirm DIR): a REGRESSION / UNSTABLE / overhead-budget
+   violation only counts when the same scenario+metric also flags in the confirmation run
+   (they are all derived from noisy latency measurements). Error rate, checks, dropped
+   iterations and disconnect propagation are not re-judged: one bad repeat must not be
+   washed away by a lucky second run.
 
 Inputs are metrics.json files produced by aggregate_release.py (schema 1 or 2).
 A baseline without per-run statistics is re-aggregated from its per-run logs
@@ -575,16 +578,31 @@ def evaluate(cur, base, gates, slo_cfg):
     return res
 
 
+# SLO violations that come from noisy latency measurements and may be confirmed (or not) by a re-run.
+CONFIRMABLE_SLO_METRICS = set(OVERHEAD_METRIC_NAME.values())
+
+
 def confirm_findings(res, confirm_res):
-    """Split regressions / unstable scenarios into confirmed and unconfirmed by a
-    second run. Only findings that also flag in the confirmation run are kept."""
+    """Split the findings of a run into confirmed and unconfirmed by a second run.
+
+    Regressions, unstable scenarios and overhead-budget violations only count when they also
+    flag in the confirmation run. Every other absolute SLO violation (errors, checks, dropped
+    iterations, disconnect propagation) is kept as it is."""
     reg_keys = {(s, m) for s, m, _, _ in confirm_res["regressions"]}
     unst_keys = {s for s, _ in confirm_res["unstable"]}
-    confirmed_regs = [r for r in res["regressions"] if (r[0], r[1]) in reg_keys]
-    unconfirmed_regs = [r for r in res["regressions"] if (r[0], r[1]) not in reg_keys]
-    confirmed_unst = [u for u in res["unstable"] if u[0] in unst_keys]
-    unconfirmed_unst = [u for u in res["unstable"] if u[0] not in unst_keys]
-    return confirmed_regs, unconfirmed_regs, confirmed_unst, unconfirmed_unst
+    slo_keys = {(v["scenario"], v["metric"]) for v in confirm_res["absolute_slo_violations"]}
+
+    def slo_confirmed(v):
+        return v["metric"] not in CONFIRMABLE_SLO_METRICS or (v["scenario"], v["metric"]) in slo_keys
+
+    return {
+        "regressions": [r for r in res["regressions"] if (r[0], r[1]) in reg_keys],
+        "unconfirmed_regressions": [r for r in res["regressions"] if (r[0], r[1]) not in reg_keys],
+        "unstable": [u for u in res["unstable"] if u[0] in unst_keys],
+        "unconfirmed_unstable": [u for u in res["unstable"] if u[0] not in unst_keys],
+        "slo": [v for v in res["absolute_slo_violations"] if slo_confirmed(v)],
+        "unconfirmed_slo": [v for v in res["absolute_slo_violations"] if not slo_confirmed(v)],
+    }
 
 
 # --------------------------------------------------------------------------- environment
@@ -779,15 +797,19 @@ def main(argv=None):
     lines += ["", "## Regression Summary", ""]
 
     regressions, warnings, unstable = res["regressions"], res["warnings"], res["unstable"]
-    unconfirmed_regs, unconfirmed_unst, confirm_note = [], [], None
+    unconfirmed_regs, unconfirmed_unst, unconfirmed_slo, confirm_note = [], [], [], None
     if args.confirm:
         confirm = load_metrics(args.confirm)
         confirm_res = evaluate(confirm, base, gates, slo_cfg)
-        regressions, unconfirmed_regs, unstable, unconfirmed_unst = confirm_findings(res, confirm_res)
+        found = confirm_findings(res, confirm_res)
+        regressions, unconfirmed_regs = found["regressions"], found["unconfirmed_regressions"]
+        unstable, unconfirmed_unst = found["unstable"], found["unconfirmed_unstable"]
+        absolute_slo_violations, unconfirmed_slo = found["slo"], found["unconfirmed_slo"]
+        not_reproduced = len(unconfirmed_regs) + len(unconfirmed_unst) + len(unconfirmed_slo)
         confirm_note = (f"Confirmation run: {confirm.get('version','?')} ({confirm.get('captured_at','?')}) — "
-                        f"{len(regressions)} regression(s) and {len(unstable)} unstable scenario(s) confirmed, "
-                        f"{len(unconfirmed_regs)} regression(s) and {len(unconfirmed_unst)} unstable "
-                        f"scenario(s) not reproduced.")
+                        f"{len(regressions)} regression(s), {len(unstable)} unstable scenario(s) and "
+                        f"{len(absolute_slo_violations)} SLO violation(s) stand; "
+                        f"{not_reproduced} finding(s) did not reproduce.")
 
     lines.append("| Scenario | Verdict | Details | Stability |")
     lines.append("|---|---|---|---|")
@@ -810,12 +832,14 @@ def main(argv=None):
                      + ", ".join(f"{s} (CV {cv:.1f}%)" for s, cv in unstable))
     if warnings and not regressions:
         lines.append(f"\n{len(warnings)} warning(s) — monitor, no action required.")
-    if unconfirmed_regs or unconfirmed_unst:
+    if unconfirmed_regs or unconfirmed_unst or unconfirmed_slo:
         lines += ["", "**Not reproduced in the confirmation run (treated as noise):**"]
         for s, m, ds, d in unconfirmed_regs:
             lines.append(f"- `{s}` / **{m}**: {d}")
         for s, cv in unconfirmed_unst:
             lines.append(f"- `{s}` unstable (CV {cv:.1f}%)")
+        for v in unconfirmed_slo:
+            lines.append(f"- `{v['scenario']}` / **{v['metric']}** (SLO): {v['detail']}")
 
     if absolute_slo_violations:
         lines += ["", f"**{len(absolute_slo_violations)} absolute SLO violation(s):**"]
@@ -846,6 +870,7 @@ def main(argv=None):
                 "regressions": [{"scenario": s, "metric": m, "delta": ds, "detail": d}
                                 for s, m, ds, d in unconfirmed_regs],
                 "unstable": [{"scenario": s, "cv_pct": cv} for s, cv in unconfirmed_unst],
+                "slo_violations": unconfirmed_slo,
             } if args.confirm else None,
             "absolute_slo_violations": absolute_slo_violations,
             "gateway_overhead_estimates": paired,

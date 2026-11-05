@@ -455,6 +455,28 @@ class Confirmation(Base):
         self.assertEqual(v["overall"], "PASS")
         self.assertEqual(rc, 0)
 
+    def test_overhead_budget_violations_are_confirmable_but_error_rate_is_not(self):
+        base = self.release("base", pair("token-chat-openai", "direct-token-chat-openai", overhead=1.0))
+        breach = {**pair("token-chat-openai", "direct-token-chat-openai", overhead=30.0)}
+        breach["token-chat-openai"]["err"] = 5.0                      # a real error problem as well
+        cur = self.release("cur", breach)
+        calm = self.release("conf", pair("token-chat-openai", "direct-token-chat-openai", overhead=1.0))
+        rc, v, _ = self.run_cmp(cur, base, confirm=calm)
+        metrics = {x["metric"] for x in v["absolute_slo_violations"]}
+        self.assertIn("error_rate_pct", metrics)                      # never washed away
+        self.assertNotIn("overhead_p95_ms", metrics)                  # did not reproduce
+        self.assertIn("overhead_p95_ms", {x["metric"] for x in v["unconfirmed"]["slo_violations"]})
+        self.assertEqual(v["overall"], "ABSOLUTE_SLO_FAIL")           # because of the errors
+        self.assertEqual(rc, 1)
+
+    def test_a_reproduced_overhead_breach_stands(self):
+        base = self.release("base", pair("token-chat-openai", "direct-token-chat-openai", overhead=1.0))
+        cur = self.release("cur", pair("token-chat-openai", "direct-token-chat-openai", overhead=30.0))
+        again = self.release("conf", pair("token-chat-openai", "direct-token-chat-openai", overhead=28.0))
+        _, v, _ = self.run_cmp(cur, base, confirm=again)
+        self.assertIn("overhead_p95_ms", {x["metric"] for x in v["absolute_slo_violations"]})
+        self.assertEqual(v["unconfirmed"]["slo_violations"], [])
+
     def test_without_confirm_the_field_is_null(self):
         base = self.release("base", self.specs(100.0, 100.0))
         _, v, _ = self.run_cmp(self.release("cur", self.specs(100.0, 100.0)), base)

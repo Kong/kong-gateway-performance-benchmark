@@ -28,6 +28,13 @@
 #                             TIER=tier1 INCLUDE_PENDING=true REPEATS=1 ./run_release_baseline.sh
 #   DRY_RUN=true            print the plan and the time estimate, run nothing
 #                           (no cluster access, no output directory).
+#   CONFIRM_RERUN=true      (default) when the comparison with the baseline flags REGRESSION,
+#                           UNSTABLE or overhead-budget findings, re-run just those scenarios (plus their direct controls) once
+#                           into <outdir>-confirm and compare again with --confirm: only findings that
+#                           reproduce count. The first-pass report is kept as report.first-pass.md.
+#                           false disables it.
+#   CONFIRM_MAX_SCENARIOS=8 skip the confirmation run when more scenarios than this are flagged: that
+#                           many findings usually mean an environment problem, re-run the release.
 # =============================================================================
 set -uo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -42,6 +49,12 @@ TIER="${TIER:-tier2}"
 ORDER="${ORDER:-interleaved}"
 SEED="${SEED:-1}"
 DRY_RUN="${DRY_RUN:-false}"
+CONFIRM_RERUN="${CONFIRM_RERUN:-true}"
+CONFIRM_MAX_SCENARIOS="${CONFIRM_MAX_SCENARIOS:-8}"
+# Settling pauses (seconds): after deleting the previous TestRun, and before reading the fake
+# provider stats so streams that were not cancelled show up as completed.
+DRIVER_SETTLE_SECONDS="${DRIVER_SETTLE_SECONDS:-4}"
+UPSTREAM_SETTLE_SECONDS="${UPSTREAM_SETTLE_SECONDS:-3}"
 MATRIX_FILE="${MATRIX_FILE:-$SCRIPT_DIR/release_matrix.yaml}"
 GATES_FILE="${RELEASE_GATES_PATH:-$SCRIPT_DIR/release_gates.yaml}"
 SLO_CONFIG_FILE="${SLO_CONFIG_PATH:-$SCRIPT_DIR/benchmark_config.yaml}"
@@ -97,14 +110,6 @@ if [[ "$DRY_RUN" == "true" ]]; then
   exit 0
 fi
 
-mkdir -p "$OUTDIR"
-# Keep the executed order next to the results as evidence.
-printf '%s\n' "${PLAN[@]}" > "$OUTDIR/plan.tsv"
-
-# Record the test environment (nodes, zones, Kong image digest, configs, ...) for drift checks.
-# Best effort: it never fails the run.
-python3 collect_env.py --out "$OUTDIR/env.json" --phase start || echo "WARNING: could not record the environment (start)"
-
 # Lines of the k6 summary kept in each per-run log (parsed by aggregate_release.py).
 # p90/p95/p99 and avg/med/max latency, achieved rate, failures, checks, TTFT,
 # iterations + dropped_iterations (the "iterations total" alternative matches
@@ -119,7 +124,7 @@ fake_provider_stats() {  # $1: "" -> read, "/reset" -> zero the counters
 
 record_upstream_stats() {  # $1: per-run log to append the "upstream stats:" line to
   local json line
-  sleep 3   # let streams that were not cancelled finish, so they show up as completed
+  sleep "$UPSTREAM_SETTLE_SECONDS"   # let streams that were not cancelled finish, so they show up as completed
   json=$(fake_provider_stats "") || json=""
   line=$(python3 - "$json" <<'PY'
 import json, sys
@@ -148,7 +153,7 @@ run_one() {
   {
     echo "[driver] deleting previous testruns"
     kubectl delete testrun -n k6 --all --ignore-not-found
-    sleep 4
+    sleep "$DRIVER_SETTLE_SECONDS"
     echo "[driver] running scenario=$scenario fixture=$fixture load=$load duration=$DURATION"
     bash run_ai_benchmark.sh "$scenario" "$fixture" "$load" "$DURATION"
   } >"$run_driver_log" 2>&1
@@ -180,20 +185,75 @@ run_one() {
   fi
 }
 
-current_round=0
-for line in "${PLAN[@]}"; do
-  IFS=$'\t' read -r r scenario fixture load scenario_key status <<< "$line"
-  if [[ "$r" != "$current_round" ]]; then
-    current_round="$r"
-    echo "=== Round $r/$REPEATS ==="
+# Run PLAN into OUTDIR: record the environment, execute every run, aggregate.
+execute_runs() {
+  local current_round=0 line r scenario fixture load scenario_key status
+  mkdir -p "$OUTDIR"
+  # Keep the executed order next to the results as evidence.
+  printf '%s\n' "${PLAN[@]}" > "$OUTDIR/plan.tsv"
+
+  # Record the test environment (nodes, zones, Kong image digest, configs, ...) for drift checks.
+  # Best effort: it never fails the run.
+  python3 collect_env.py --out "$OUTDIR/env.json" --phase start || echo "WARNING: could not record the environment (start)"
+
+  for line in "${PLAN[@]}"; do
+    IFS=$'\t' read -r r scenario fixture load scenario_key status <<< "$line"
+    if [[ "$r" != "$current_round" ]]; then
+      current_round="$r"
+      echo "=== Round $r/$REPEATS ==="
+    fi
+    run_one "$r" "$scenario" "$fixture" "$load" "$scenario_key"
+  done
+
+  python3 collect_env.py --out "$OUTDIR/env.json" --phase end || echo "WARNING: could not record the environment (end)"
+
+  echo "=== aggregating ==="
+  python3 aggregate_release.py --dir "$OUTDIR" --version "$VERSION" --captured-at "$CAPTURED_AT"
+}
+
+# Re-run only the scenarios the comparison flagged as REGRESSION / UNSTABLE (with their direct
+# controls: the overhead is a paired difference) and compare again, counting only findings that
+# reproduce. That covers regressions, unstable scenarios and overhead-budget violations; errors,
+# checks, dropped iterations and disconnect propagation are not re-judged.
+confirm_flagged() {
+  local flagged count main_outdir="$OUTDIR" main_plan=("${PLAN[@]}")
+  flagged=$(python3 - "$OUTDIR/verdict.json" <<'PY'
+import json, sys
+try:
+    v = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+keys = [r["scenario"] for r in v.get("regressions", [])] + [u["scenario"] for u in v.get("unstable", [])]
+# overhead-budget violations come from the same noisy latency measurements and are confirmable too
+keys += [x["scenario"] for x in v.get("absolute_slo_violations", []) if str(x.get("metric", "")).startswith("overhead_")]
+print(",".join(dict.fromkeys(keys)))
+PY
+)
+  [[ -z "$flagged" ]] && return 0
+  count=$(tr ',' '\n' <<< "$flagged" | wc -l | tr -d ' ')
+  if (( count > CONFIRM_MAX_SCENARIOS )); then
+    echo "=== $count scenarios flagged (> CONFIRM_MAX_SCENARIOS=$CONFIRM_MAX_SCENARIOS): not re-running; that many findings usually mean an environment problem, re-run the release ==="
+    return 0
   fi
-  run_one "$r" "$scenario" "$fixture" "$load" "$scenario_key"
-done
+  echo "=== confirmation run for: $flagged ==="
+  if ! PLAN_TEXT=$(python3 release_matrix.py plan "${PLAN_ARGS[@]}" --only-keys "$flagged"); then
+    echo "WARNING: could not plan the confirmation run; keeping the first-pass verdict"
+    return 0
+  fi
+  mapfile -t PLAN <<< "$PLAN_TEXT"
+  OUTDIR="${main_outdir}-confirm"
+  [[ "$OUTDIR" == *-confirm ]] && rm -rf "$OUTDIR"   # stale results of an earlier attempt, never mix them in
+  execute_runs
+  OUTDIR="$main_outdir"
+  PLAN=("${main_plan[@]}")
+  cp "$OUTDIR/report.md" "$OUTDIR/report.first-pass.md"
+  cp "$OUTDIR/verdict.json" "$OUTDIR/verdict.first-pass.json"
+  python3 compare_release.py --current "$OUTDIR" --baseline "$BASE_DIR" --confirm "${main_outdir}-confirm" \
+    --gates "$GATES_FILE" --slo-config "$SLO_CONFIG_FILE" --out "$OUTDIR/report.md" --json "$OUTDIR/verdict.json"
+  echo "verdict exit (after confirmation): $?"
+}
 
-python3 collect_env.py --out "$OUTDIR/env.json" --phase end || echo "WARNING: could not record the environment (end)"
-
-echo "=== aggregating ==="
-python3 aggregate_release.py --dir "$OUTDIR" --version "$VERSION" --captured-at "$CAPTURED_AT"
+execute_runs
 
 # Report: if a baseline exists, diff against it; otherwise record as baseline.
 BASELINE_PTR="results/releases/baseline.json"
@@ -203,6 +263,9 @@ if [ -f "$BASELINE_PTR" ]; then
   python3 compare_release.py --current "$OUTDIR" --baseline "$BASE_DIR" \
     --gates "$GATES_FILE" --slo-config "$SLO_CONFIG_FILE" --out "$OUTDIR/report.md" --json "$OUTDIR/verdict.json"
   echo "verdict exit: $?"
+  if [[ "$CONFIRM_RERUN" == "true" ]]; then
+    confirm_flagged
+  fi
 else
   echo "=== no baseline yet — recording $OUTDIR as the reference baseline (gates: $GATES_FILE) ==="
   python3 compare_release.py --current "$OUTDIR" --gates "$GATES_FILE" \

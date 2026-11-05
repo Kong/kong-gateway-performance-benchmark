@@ -25,8 +25,13 @@ and (3) prove the comparison harness — so future releases are a turnkey diff.
    relative change between releases is meaningful.
 3. **Stability gate** — ≥3 repeats, per-metric CV (sample standard deviation) < 15%. A noisy run is `UNSTABLE` →
    re-run, don't trust/escalate.
-4. **Confirmation (optional)** — `compare_release.py --confirm <second run>`: a REGRESSION/UNSTABLE only counts when
-   the same scenario+metric also flags in the second run.
+4. **Confirmation** — the release runner re-runs just the flagged scenarios (plus their direct controls, because the
+   overhead is a paired difference) once into `<outdir>-confirm` and compares again with
+   `compare_release.py --confirm`: a REGRESSION, UNSTABLE or overhead-budget finding only counts when the same
+   scenario+metric also flags in the second run. Errors, checks, dropped iterations and disconnect propagation are
+   never washed away by a lucky re-run. The first-pass report is kept as `report.first-pass.md`.
+   `CONFIRM_RERUN=false` turns it off; when more than `CONFIRM_MAX_SCENARIOS` (8) scenarios are flagged it is skipped,
+   because that many findings usually mean an environment problem — re-run the whole release instead.
 
 Statistics: the relative gate uses the **median** across repeats (one cold or noisy run cannot trip it) when both
 runs have per-run statistics, otherwise the mean; the error rate always uses the mean so one bad repeat cannot hide.

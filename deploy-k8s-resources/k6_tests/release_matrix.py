@@ -25,6 +25,7 @@ Usage
 -----
     release_matrix.py plan    [--matrix F] [--tier tier1|tier2] [--repeats N]
                               [--include-mlflow50 true|false] [--include-pending true|false]
+                              [--only-keys k1,k2,...] [--expand-groups true|false]
                               [--order interleaved|shuffle|sequential]
                               [--seed N] [--format tsv|json]
     release_matrix.py summary [same options] [--duration 3m]
@@ -116,6 +117,18 @@ def select(entries, tier="tier2", include_mlflow50=True, include_pending=False):
     return out
 
 
+def restrict(entries, keys, expand_groups=True):
+    """Only the entries whose result key is in `keys`. With expand_groups, every entry that shares
+    a group with one of them comes along: re-running a gateway scenario needs its direct control
+    from the same round, because the overhead is a paired difference."""
+    wanted = set(keys)
+    chosen = [e for e in entries if e["key"] in wanted]
+    if expand_groups:
+        groups = {e["group"] for e in chosen if e["group"]}
+        chosen = [e for e in entries if e["key"] in wanted or (e["group"] and e["group"] in groups)]
+    return chosen
+
+
 def build_groups(entries):
     """Ordered list of groups; an ungrouped entry is a group of one.
     A group sits at the position of its first member."""
@@ -173,6 +186,10 @@ def _common(ap):
     ap.add_argument("--include-mlflow50", default="true", choices=("true", "false"))
     ap.add_argument("--include-pending", default="false", choices=("true", "false"),
                     help="also plan entries that are implemented but not yet enabled (cluster smoke run)")
+    ap.add_argument("--only-keys", default="",
+                    help="comma-separated result keys: plan only these (used to re-run flagged scenarios)")
+    ap.add_argument("--expand-groups", default="true", choices=("true", "false"),
+                    help="with --only-keys, also plan the entries that share a group (direct controls)")
     ap.add_argument("--order", default="interleaved", choices=ORDERS)
     ap.add_argument("--seed", type=int, default=1)
 
@@ -191,6 +208,14 @@ def main(argv=None):
     try:
         entries = select(load_matrix(args.matrix), args.tier, args.include_mlflow50 == "true",
                          args.include_pending == "true")
+        if args.only_keys:
+            keys = [k for k in args.only_keys.split(",") if k]
+            known = {e["key"] for e in entries}
+            unknown = sorted(set(keys) - known)
+            if unknown:
+                print(f"release_matrix.py: ignoring keys that are not in the selected plan: {', '.join(unknown)}",
+                      file=sys.stderr)
+            entries = restrict(entries, keys, args.expand_groups == "true")
         if not entries:
             raise MatrixError("no runnable entries selected")
         runs = plan(entries, args.repeats, args.order, args.seed)
