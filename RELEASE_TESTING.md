@@ -155,6 +155,16 @@ plain HTTP, so the overhead includes the TLS cost of the client hop until the HT
 When an `env.json` sits in both results directories it is compared: drift in instance types, k6 version, config hashes
 or in whether each node shares Kong's availability zone is reported, but does not change the verdict.
 
+## Diagnosing streaming TTFT
+k6's TTFT is time-to-first-byte; it cannot tell whether the gateway delays the first bytes, holds back the first few
+chunks and releases them in a burst, or slows everything. `diagnose_stream_ttft.py` sends real streaming requests to
+the gateway route and to the direct upstream route, timestamps every SSE event, and compares: first event, gap between
+events and the size of the burst at the start of the stream (an even stream has a burst of 1). Its verdict is a
+heuristic (`BUFFERS_STREAM_START`, `DELAYS_FIRST_BYTES_ONLY`, `ADDS_LATENCY`, `NO_TTFT_OVERHEAD`); the numbers are the
+evidence. Run it through `kubectl port-forward` (see the header of the script); absolute times include the
+port-forward hop, the first-event delta and the burst size are what matter. It is the way to find out why
+`stream-openai` shows a TTFT of ~524 ms while `stream-gemini` shows ~123 ms with the same upstream settings.
+
 ## When a regression fires
 1. The report's escalation list names exactly what regressed (scenario, metric, Δ%, limit).
 2. Confirm it's real, not noise: check the `cv_pct` — high CV → re-run before escalating.
