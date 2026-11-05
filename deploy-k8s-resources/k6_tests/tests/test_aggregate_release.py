@@ -170,6 +170,33 @@ class AggregateScenario(unittest.TestCase):
         self.assertEqual(a["repeats"], 2)
 
 
+class PerRun(unittest.TestCase):
+    def test_per_run_is_ordered_numerically_and_keeps_raw_values(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            # run10 sorts before run2 lexicographically; per_run must order by number
+            for n, v in ((10, 110.0), (2, 102.0), (1, 101.0)):
+                (d / f"s__run{n}.log").write_text(new_log(p95=v))
+            subprocess.run([sys.executable, "-B", str(K6_TESTS / "aggregate_release.py"), "--dir", str(d),
+                            "--version", "v", "--captured-at", "x"], check=True, capture_output=True)
+            m = json.loads((d / "metrics.json").read_text())["scenarios"]["s"]
+        self.assertEqual([r["run"] for r in m["per_run"]], [1, 2, 10])
+        self.assertEqual([r["p95_ms"] for r in m["per_run"]], [101.0, 102.0, 110.0])
+        self.assertIn("p50_ms", m["per_run"][0])
+        self.assertEqual(m["per_run"][0]["dropped_pct"], 0.0)
+
+    def test_per_run_values_can_be_null_for_old_logs(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "s__run1.log").write_text(OLD_LOG)
+            subprocess.run([sys.executable, "-B", str(K6_TESTS / "aggregate_release.py"), "--dir", str(d),
+                            "--version", "v", "--captured-at", "x"], check=True, capture_output=True)
+            m = json.loads((d / "metrics.json").read_text())["scenarios"]["s"]
+        self.assertEqual(m["per_run"][0]["p95_ms"], 614.58)
+        self.assertIsNone(m["per_run"][0]["p50_ms"])
+        self.assertIsNone(m["per_run"][0]["dropped_pct"])
+
+
 class EndToEnd(unittest.TestCase):
     def test_main_writes_schema_v2_skips_driver_logs_and_keeps_csv_prefix(self):
         with tempfile.TemporaryDirectory() as d:

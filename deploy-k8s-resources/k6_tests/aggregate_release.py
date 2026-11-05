@@ -18,7 +18,10 @@ Per scenario, metrics.json holds:
   * dropped_pct {mean, max}: dropped_iterations / (iterations + dropped_iterations)
     per repeat, in percent — null when the logs predate that field;
   * status_totals: HTTP status / error counts summed over repeats — null when
-    the logs predate that field.
+    the logs predate that field;
+  * per_run: the raw per-repeat values, ordered by run number. compare_release.py
+    pairs gateway and direct runs of the same round (they run back-to-back) to
+    estimate gateway overhead from paired differences.
 
 The extra statistics are deliberately NOT part of cv_pct: compare_release.py
 takes the worst value in cv_pct as the scenario's stability, and noisy-by-nature
@@ -156,6 +159,14 @@ def aggregate_scenario(reps):
         {"mean": round(statistics.mean(dropped), 3), "max": round(max(dropped), 3)} if dropped else None
     )
 
+    ordered = sorted(reps, key=lambda r: (r.get("run") is None, r.get("run") or 0))
+    agg["per_run"] = [
+        {"run": r.get("run"),
+         **{m: r.get(m) for m in STAT_METRICS},
+         "dropped_pct": None if r.get("dropped_pct") is None else round(r["dropped_pct"], 3)}
+        for r in ordered
+    ]
+
     totals = defaultdict(int)
     seen = False
     for r in reps:
@@ -167,6 +178,20 @@ def aggregate_scenario(reps):
     return agg
 
 
+def collect_scenarios(d):
+    """Aggregate every <scenario>__run<N>.log in directory d (driver logs skipped)."""
+    runs = defaultdict(list)  # scenario -> [per-repeat dicts]
+    for log in sorted(Path(d).glob("*__run*.log")):
+        if log.name.endswith(".driver.log"):
+            continue
+        scenario = log.name.split("__run")[0]
+        rep = parse_log(log)
+        m = re.search(r"__run(\d+)\.log$", log.name)
+        rep["run"] = int(m.group(1)) if m else None
+        runs[scenario].append(rep)
+    return {scenario: aggregate_scenario(reps) for scenario, reps in runs.items()}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", required=True)
@@ -175,14 +200,7 @@ def main():
     args = ap.parse_args()
 
     d = Path(args.dir)
-    runs = defaultdict(list)  # scenario -> [per-repeat dicts]
-    for log in sorted(d.glob("*__run*.log")):
-        if log.name.endswith(".driver.log"):
-            continue
-        scenario = log.name.split("__run")[0]
-        runs[scenario].append(parse_log(log))
-
-    scenarios = {scenario: aggregate_scenario(reps) for scenario, reps in runs.items()}
+    scenarios = collect_scenarios(d)
 
     metrics = {
         "schema_version": SCHEMA_VERSION,
