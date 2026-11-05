@@ -212,9 +212,12 @@ The streaming scenarios of every release up to 2026-11-05 therefore measured a b
 `build_declarative.py`; every other route keeps Kong's default). An A/B on the cluster (3 repeats per config)
 showed the same total duration, errors, usage in the final event and client-disconnect propagation, and the k6
 TTFT of `stream-openai` going from 524 ms to 123 ms (= direct). Consequences: streaming results recorded before
-this change are **not comparable** with new ones (the k6 TTFT is the arrival of the headers, and CPU per request
-may differ), so rebuild the baseline for `stream-*` before gating them; `env.json` carries a hash of the
-declarative config, so the report flags the difference.
+this change are **not comparable** with new ones (the k6 TTFT is the arrival of the headers), so rebuild the
+baseline for `stream-*` before gating them; `env.json` carries a hash of the declarative config, so the report
+flags the difference. CPU per request: a 6-round interleaved A/B (`paired_ab.py`) found no reliable difference
+(`stream-openai` +8.8% on average but +0.33...+0.90 in rounds 1-4 and about 0 in rounds 5-6, sign test p = 0.69;
+`stream-gemini` -0.8%). The paired difference of two runs minutes apart has an sd of 6-10% of the mean, so a CPU
+tolerance tighter than ~15% will raise false alarms.
 
 ## When a regression fires
 1. The report's escalation list names exactly what regressed (scenario, metric, Δ%, limit).
