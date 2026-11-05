@@ -365,6 +365,17 @@ async function route(req, res) {
     return
   }
 
+  if (req.method === 'GET' && currentUrl.pathname === '/__stats') {
+    sendJson(res, 200, { ...stats })
+    return
+  }
+
+  if (req.method === 'GET' && currentUrl.pathname === '/__stats/reset') {
+    resetStats()
+    sendJson(res, 200, { ...stats })
+    return
+  }
+
   if (req.method === 'GET' && currentUrl.pathname === '/healthz') {
     sendJson(res, 200, { status: 'ok' })
     return
@@ -406,7 +417,43 @@ async function route(req, res) {
   sendJson(res, 404, { error: `unknown path: ${currentUrl.pathname}` })
 }
 
+// ---------------------------------------------------------------------------
+// Lifecycle counters, for tests that need to know what happened on the upstream
+// side. GET /__stats returns them, GET /__stats/reset zeroes them.
+//   started    requests accepted        completed  responses fully written
+//   aborted    connections closed before the response finished (client or
+//              gateway hung up mid-stream)      active     responses open now
+// After a client-disconnect test, aborted ~ number of disconnects means the
+// gateway propagated the cancel upstream; completed ~ number means it did not.
+// ---------------------------------------------------------------------------
+const stats = { started: 0, completed: 0, aborted: 0, active: 0 }
+
+function resetStats() {
+  stats.started = 0
+  stats.completed = 0
+  stats.aborted = 0
+  stats.active = 0
+}
+
+function trackLifecycle(req, res) {
+  if (String(req.url || '').startsWith('/__stats')) {
+    return
+  }
+
+  stats.started += 1
+  stats.active += 1
+  res.on('close', () => {
+    stats.active -= 1
+    if (res.writableFinished) {
+      stats.completed += 1
+    } else {
+      stats.aborted += 1
+    }
+  })
+}
+
 const server = http.createServer((req, res) => {
+  trackLifecycle(req, res)
   route(req, res).catch(error => {
     console.error('fake provider error', error)
     if (!res.headersSent) {
