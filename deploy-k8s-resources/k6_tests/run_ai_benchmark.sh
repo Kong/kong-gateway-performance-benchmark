@@ -36,6 +36,14 @@ Scenarios:
   routing-ewma           EWMA lowest-latency routing (AIGW-PERF-102)
   routing-failover       Failover scenario (AIGW-PERF-104)
   payload-logging      Payload logging overhead (AIGW-PERF-006): reuses token-chat script
+  token-chat-openai-http / embeddings-openai-http
+                       Same routes entered over plain HTTP (splits TLS cost from gateway overhead)
+  direct-stream-gemini Direct fake_provider Gemini stream (gateway bypass)
+  token-chat-openai-churn / token-chat-openai-http-churn
+                       New TCP(+TLS) connection per request (k6 noConnectionReuse)
+  stream-openai-disconnect
+                       Client hangs up mid-stream (short timeout, K6_AI_DISCONNECT_AFTER, default 300ms);
+                       pair with the fake provider /__stats to see whether the gateway cancels upstream
 
 Examples:
   ./run_ai_benchmark.sh token-chat-openai short 25 6m
@@ -124,6 +132,9 @@ K6_AI_APIKEY="${K6_AI_APIKEY:-}"
 K6_AI_SCENARIO_NAME=
 K6_AI_CACHE_MODE=
 K6_AI_MODEL=
+K6_AI_NO_REUSE=
+# Preserve a caller-provided timeout; the disconnect scenario sets a short one itself.
+K6_AI_TIMEOUT="${K6_AI_TIMEOUT:-}"
 LOAD_KIND=
 
 case "$SCENARIO" in
@@ -317,6 +328,77 @@ case "$SCENARIO" in
     K6_AI_SCENARIO_NAME="payload-logging"
     LOAD_KIND="rps"
     ;;
+  token-chat-openai-http)
+    # Same route as token-chat-openai, entered over plain HTTP (no TLS on the client hop).
+    # gateway-HTTPS minus gateway-HTTP is the TLS cost; gateway-HTTP minus direct is the pure gateway overhead.
+    SCRIPT_FILE="k6_ai_token_chat.js"
+    K6_AI_CHAT_URL="http://kong-kong-proxy.kong.svc.cluster.local/bench/token/chat/openai"
+    K6_AI_RATE=${LOAD:-25}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    K6_AI_STREAM_VUS=25
+    LOAD_KIND="rps"
+    ;;
+  embeddings-openai-http)
+    SCRIPT_FILE="k6_ai_embeddings.js"
+    K6_AI_CHAT_URL="http://kong-kong-proxy.kong.svc.cluster.local/bench/token/embeddings/openai"
+    K6_AI_RATE=${LOAD:-40}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    K6_AI_STREAM_VUS=25
+    LOAD_KIND="rps"
+    ;;
+  direct-stream-gemini)
+    SCRIPT_FILE="k6_ai_stream_gemini.js"
+    K6_AI_CHAT_URL="http://fake-provider.upstream.svc.cluster.local:8080/v1beta/models/mock-gemini-2.5-flash:streamGenerateContent"
+    K6_AI_RATE=25
+    K6_AI_STREAM_VUS=${LOAD:-30}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    LOAD_KIND="vus"
+    ;;
+  token-chat-openai-churn)
+    # Connection churn: every request opens a new TCP + TLS connection (k6 noConnectionReuse),
+    # so this scenario minus token-chat-openai is the connection-setup cost.
+    SCRIPT_FILE="k6_ai_token_chat.js"
+    K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/token/chat/openai"
+    K6_AI_NO_REUSE="true"
+    K6_AI_RATE=${LOAD:-25}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    K6_AI_STREAM_VUS=25
+    LOAD_KIND="rps"
+    ;;
+  token-chat-openai-http-churn)
+    # Same over plain HTTP: churn(HTTPS) minus churn(HTTP) is the TLS handshake cost.
+    SCRIPT_FILE="k6_ai_token_chat.js"
+    K6_AI_CHAT_URL="http://kong-kong-proxy.kong.svc.cluster.local/bench/token/chat/openai"
+    K6_AI_NO_REUSE="true"
+    K6_AI_RATE=${LOAD:-25}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    K6_AI_STREAM_VUS=25
+    LOAD_KIND="rps"
+    ;;
+  stream-openai-disconnect)
+    # Client hangs up mid-stream (a short client timeout). The release runner resets the fake
+    # provider's /__stats before the run and records them after it: aborted ~ started means the
+    # gateway propagated the cancel upstream, completed ~ started means it let the upstream run on.
+    SCRIPT_FILE="k6_ai_stream_disconnect.js"
+    K6_AI_CHAT_URL="https://kong-kong-proxy.kong.svc.cluster.local/bench/token/stream/openai"
+    K6_AI_TIMEOUT="${K6_AI_TIMEOUT:-${K6_AI_DISCONNECT_AFTER:-300ms}}"
+    K6_AI_RATE=25
+    K6_AI_STREAM_VUS=${LOAD:-30}
+    K6_AI_DURATION=${DURATION:-6m}
+    K6_AI_PRE_ALLOCATED_VUS=50
+    K6_AI_MAX_VUS=200
+    LOAD_KIND="vus"
+    ;;
   *)
     echo "Unknown scenario: $SCENARIO"
     usage
@@ -327,6 +409,7 @@ K6_AI_PRE_ALLOCATED_VUS=${K6_AI_PRE_ALLOCATED_VUS_OVERRIDE:-$K6_AI_PRE_ALLOCATED
 K6_AI_MAX_VUS=${K6_AI_MAX_VUS_OVERRIDE:-$K6_AI_MAX_VUS}
 K6_AI_CHAT_URL=${K6_AI_CHAT_URL_OVERRIDE:-$K6_AI_CHAT_URL}
 K6_AI_MODEL=${K6_AI_MODEL_OVERRIDE:-$K6_AI_MODEL}
+K6_AI_TIMEOUT=${K6_AI_TIMEOUT:-120s}
 
 echo "SCENARIO=$SCENARIO"
 echo "FIXTURE=$FIXTURE"
@@ -339,6 +422,8 @@ echo "K6_AI_DURATION=$K6_AI_DURATION"
 echo "K6_AI_PRE_ALLOCATED_VUS=$K6_AI_PRE_ALLOCATED_VUS"
 echo "K6_AI_MAX_VUS=$K6_AI_MAX_VUS"
 echo "K6_AI_MODEL=$K6_AI_MODEL"
+echo "K6_AI_TIMEOUT=$K6_AI_TIMEOUT"
+echo "K6_AI_NO_REUSE=$K6_AI_NO_REUSE"
 
 if [[ -f "$NEW_RESOURCE_FILENAME" ]]; then
   kubectl delete -n k6 --ignore-not-found=true --wait=true -f "$NEW_RESOURCE_FILENAME" || true
@@ -358,7 +443,9 @@ yq -M eval-all ".spec.script.configMap.file = \"$SCRIPT_FILE\" |
   (.spec.runner.env[] | select(.name == \"K6_AI_MODEL\").value) |= \"$K6_AI_MODEL\" |
   (.spec.runner.env[] | select(.name == \"K6_AI_APIKEY\").value) |= \"$K6_AI_APIKEY\" |
   (.spec.runner.env[] | select(.name == \"K6_AI_SCENARIO_NAME\").value) |= \"$K6_AI_SCENARIO_NAME\" |
-  (.spec.runner.env[] | select(.name == \"K6_AI_CACHE_MODE\").value) |= \"$K6_AI_CACHE_MODE\"" "$RESOURCE_FILENAME" > "$NEW_RESOURCE_FILENAME"
+  (.spec.runner.env[] | select(.name == \"K6_AI_CACHE_MODE\").value) |= \"$K6_AI_CACHE_MODE\" |
+  (.spec.runner.env[] | select(.name == \"K6_AI_TIMEOUT\").value) |= \"$K6_AI_TIMEOUT\" |
+  (.spec.runner.env[] | select(.name == \"K6_AI_NO_REUSE\").value) |= \"$K6_AI_NO_REUSE\"" "$RESOURCE_FILENAME" > "$NEW_RESOURCE_FILENAME"
 
 kubectl apply -n k6 -f "$NEW_RESOURCE_FILENAME"
 

@@ -91,6 +91,8 @@ spec:
         value: ""
       - name: K6_AI_CACHE_MODE
         value: ""
+      - name: K6_AI_NO_REUSE
+        value: ""
     affinity:
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:

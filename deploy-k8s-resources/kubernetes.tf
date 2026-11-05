@@ -104,6 +104,7 @@ resource "kubernetes_config_map" "kong_load_test" {
     "k6_ai_token_chat.js"        = "${file("${path.module}/k6_tests/k6_ai_token_chat.js")}"
     "k6_ai_stream_openai.js"     = "${file("${path.module}/k6_tests/k6_ai_stream_openai.js")}"
     "k6_ai_stream_gemini.js"     = "${file("${path.module}/k6_tests/k6_ai_stream_gemini.js")}"
+    "k6_ai_stream_disconnect.js" = "${file("${path.module}/k6_tests/k6_ai_stream_disconnect.js")}"
     "k6_ai_embeddings.js"        = "${file("${path.module}/k6_tests/k6_ai_embeddings.js")}"
     "k6_ai_policy_chat.js"       = "${file("${path.module}/k6_tests/k6_ai_policy_chat.js")}"
     "k6_ai_policy_semantic_cache.js" = "${file("${path.module}/k6_tests/k6_ai_policy_semantic_cache.js")}"

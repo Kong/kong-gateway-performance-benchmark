@@ -23,6 +23,8 @@ const outputTokensTotal = new Counter('ai_output_tokens_total')
 const totalTokensTotal = new Counter('ai_total_tokens_total')
 
 export const options = {
+  // K6_AI_NO_REUSE=true: every request opens a new TCP (+TLS) connection, to measure connection churn.
+  noConnectionReuse: __ENV.K6_AI_NO_REUSE === 'true',
   scenarios: {
     token_chat: {
       executor: 'constant-arrival-rate',
