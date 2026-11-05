@@ -75,83 +75,104 @@ class RealMatrix(unittest.TestCase):
         self.assertTrue({e["key"] for e in self.tier1} <= {e["key"] for e in self.tier2})
 
     def test_disabled_entries_are_never_planned(self):
+        # none are disabled at the moment; the rule holds for any that will be
         disabled = {e["key"] for e in self.all if not e["enabled"]}
-        self.assertTrue(disabled, "expected pending entries in the matrix")
         planned = {r["key"] for r in rm.plan(self.tier2, 2)}
         self.assertFalse(disabled & planned)
         for e in self.all:
             if not e["enabled"]:
                 self.assertTrue(e["pending"], f"{e['key']} is disabled without a 'pending' note")
 
+    def test_the_scenarios_added_with_the_http_churn_and_disconnect_work_are_enabled(self):
+        # they ran cleanly on the cluster (2026-11-05) and are part of the default plan
+        keys = {e["key"] for e in self.tier2}
+        for k in ("token-chat-openai-http", "token-chat-openai-http__mlflow50", "embeddings-openai-http",
+                  "embeddings-openai-http__mlflow50", "direct-stream-gemini", "token-chat-openai-churn",
+                  "token-chat-openai-http-churn", "stream-openai-disconnect"):
+            self.assertIn(k, keys)
+        self.assertEqual([e["key"] for e in self.all if not e["enabled"]], [])
+
     def test_mlflow50_toggle(self):
         no_ml = rm.select(self.all, "tier2", include_mlflow50=False)
         self.assertTrue(all(e["track"] != "mlflow50" for e in no_ml))
-        self.assertEqual(len(self.tier2) - len(no_ml), 6)
+        self.assertEqual(len(self.tier2) - len(no_ml), 8)    # 6 original + the two HTTP-entry variants
 
     def test_every_gateway_has_its_direct_pair_in_the_same_group(self):
         groups = rm.build_groups(self.tier2)
         for members in groups:
             names = {m["scenario"] for m in members}
-            if len(members) > 1:
+            if len(members) > 1 and not all("churn" in n for n in names):    # HTTPS-vs-HTTP churn pair has no direct twin
                 self.assertTrue(any(n.startswith("direct-") for n in names),
                                 f"group of >1 without a direct control: {names}")
 
     def test_expected_counts(self):
-        # 22 legacy + direct-stream-openai short = 23 runnable today
-        self.assertEqual(len(self.tier2), 23)
-        self.assertEqual(len(self.tier1), 8)  # 10 once the two HTTP-entry variants are enabled
+        # 22 legacy + direct-stream-openai + 8 added with the HTTP-entry / churn / disconnect work
+        self.assertEqual(len(self.tier2), 31)
+        self.assertEqual(len(self.tier1), 10)
+
+
+PENDING_MATRIX = """
+entries:
+  - {scenario: token-chat-openai, fixture: short, load: 50, track: core, group: pair, tier1: true}
+  - {scenario: token-chat-openai-http, fixture: short, load: 50, track: core, group: pair, tier1: true, enabled: false, pending: "needs a cluster smoke run"}
+  - {scenario: direct-token-chat-openai, fixture: short, load: 50, track: core, group: pair, tier1: true}
+  - {scenario: routing-ewma, fixture: short, load: 25, track: core}
+  - {scenario: stream-openai-disconnect, fixture: short, load: 30, track: core, enabled: false, pending: "needs a cluster smoke run"}
+  - {scenario: retired, fixture: short, load: 5, track: core, enabled: false}
+"""
 
 
 class PendingEntries(unittest.TestCase):
+    """The INCLUDE_PENDING mechanism, on a synthetic matrix: the real one has no pending entry any more."""
+
     @classmethod
     def setUpClass(cls):
-        cls.all = rm.load_matrix(REAL_MATRIX)
+        cls.path = write_matrix(PENDING_MATRIX)
+        cls.all = rm.load_matrix(cls.path)
 
-    def test_default_plan_excludes_pending_entries(self):
+    def test_default_plan_excludes_pending_and_retired_entries(self):
         keys = {e["key"] for e in rm.select(self.all, "tier2")}
-        for k in ("token-chat-openai-http", "stream-openai-disconnect", "direct-stream-gemini",
-                  "token-chat-openai-churn", "token-chat-openai-http-churn", "embeddings-openai-http"):
-            self.assertNotIn(k, keys)
+        self.assertEqual(keys, {"token-chat-openai", "direct-token-chat-openai", "routing-ewma"})
 
-    def test_include_pending_adds_the_eight_new_scenarios(self):
-        tier2 = rm.select(self.all, "tier2", include_pending=True)
-        self.assertEqual(len(tier2), 31)
-        self.assertEqual(len(rm.select(self.all, "tier1", include_pending=True)), 10)
-        keys = {e["key"] for e in tier2}
-        for k in ("token-chat-openai-http", "token-chat-openai-http__mlflow50", "embeddings-openai-http",
-                  "embeddings-openai-http__mlflow50", "direct-stream-gemini", "token-chat-openai-churn",
-                  "token-chat-openai-http-churn", "stream-openai-disconnect"):
-            self.assertIn(k, keys)
+    def test_include_pending_adds_only_entries_that_carry_a_note(self):
+        keys = {e["key"] for e in rm.select(self.all, "tier2", include_pending=True)}
+        self.assertEqual(keys, {"token-chat-openai", "token-chat-openai-http", "direct-token-chat-openai",
+                                "routing-ewma", "stream-openai-disconnect"})
+        self.assertNotIn("retired", keys)                       # disabled without a note: never planned
+        self.assertEqual({e["key"] for e in rm.select(self.all, "tier1", include_pending=True)},
+                         {"token-chat-openai", "token-chat-openai-http", "direct-token-chat-openai"})
 
     def test_pending_runs_are_flagged_and_enabled_ones_are_not(self):
         runs = rm.plan(rm.select(self.all, "tier2", include_pending=True), 1)
-        flagged = {r["key"] for r in runs if r["pending"]}
-        self.assertEqual(len(flagged), 8)
-        self.assertTrue(all(not r["pending"] for r in runs if r["key"] not in flagged))
+        self.assertEqual({r["key"] for r in runs if r["pending"]}, {"token-chat-openai-http", "stream-openai-disconnect"})
+        self.assertTrue(all(not r["pending"] for r in rm.plan(rm.select(self.all, "tier2"), 2)))
 
-    def test_http_variant_joins_its_overhead_group_and_runs_adjacent(self):
-        runs = rm.plan(rm.select(self.all, "tier2", include_pending=True), 1)
-        seq = [r["key"] for r in runs]
+    def test_a_pending_variant_joins_its_group_and_runs_adjacent(self):
+        seq = [r["key"] for r in rm.plan(rm.select(self.all, "tier2", include_pending=True), 1)]
         i = seq.index("token-chat-openai")
         self.assertEqual(set(seq[i:i + 3]), {"token-chat-openai", "token-chat-openai-http", "direct-token-chat-openai"})
 
-    def test_a_disabled_entry_without_a_pending_note_is_never_planned(self):
-        p = write_matrix("""
-            entries:
-              - {scenario: a, fixture: short, load: 5, track: core}
-              - {scenario: b, fixture: short, load: 5, track: core, enabled: false}
-              - {scenario: c, fixture: short, load: 5, track: core, enabled: false, pending: "not verified"}
-        """)
-        entries = rm.load_matrix(p)
-        self.assertEqual([e["key"] for e in rm.select(entries, "tier2")], ["a"])
-        self.assertEqual([e["key"] for e in rm.select(entries, "tier2", include_pending=True)], ["a", "c"])
+    def test_cli_summary_reports_the_pending_count_only_when_included(self):
+        def summary(*extra):
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rm.main(["summary", "--matrix", self.path, "--repeats", "3", *extra])
+            return buf.getvalue()
+        self.assertNotIn("pending=", summary())
+        out = summary("--include-pending", "true")
+        self.assertIn("scenarios=5", out)
+        self.assertIn("pending=2", out)
 
-    def test_cli_summary_reports_pending_count_only_when_included(self):
-        rc, out = Cli().run_cli("summary", "--repeats", "3")
-        self.assertNotIn("pending=", out)
-        rc, out = Cli().run_cli("summary", "--repeats", "3", "--include-pending", "true")
-        self.assertIn("scenarios=31", out)
-        self.assertIn("pending=8", out)
+    def test_only_keys_and_expand_groups(self):
+        entries = rm.select(self.all, "tier2", include_pending=True)
+        self.assertEqual({e["key"] for e in rm.restrict(entries, ["token-chat-openai-http"])},
+                         {"token-chat-openai", "token-chat-openai-http", "direct-token-chat-openai"})
+        self.assertEqual({e["key"] for e in rm.restrict(entries, ["token-chat-openai-http"], expand_groups=False)},
+                         {"token-chat-openai-http"})
+        self.assertEqual({e["key"] for e in rm.restrict(entries, ["routing-ewma"])}, {"routing-ewma"})
+        self.assertEqual(rm.restrict(entries, ["nope"]), [])
 
 
 class Ordering(unittest.TestCase):
@@ -181,10 +202,10 @@ class Ordering(unittest.TestCase):
                 self.assertEqual(idx, list(range(idx[0], idx[0] + len(idx))),
                                  f"group {gkeys} not adjacent in round {rnd}")
                 first_in_round.append(seq[idx[0]])
-            # A B | B A | A B | B A for a pair
-            self.assertEqual(first_in_round[0], first_in_round[2])
-            self.assertEqual(first_in_round[1], first_in_round[3])
-            self.assertNotEqual(first_in_round[0], first_in_round[1])
+            # the member that leads rotates each round: A B | B A | A B ... for a pair, A B C | B C A | ... for three
+            expected = [members[(r - 1) % len(members)]["key"] for r in range(1, 5)]
+            self.assertEqual(first_in_round, expected)
+            self.assertEqual(len(set(first_in_round)), min(len(members), 4))
 
     def test_group_order_is_identical_across_rounds_by_default(self):
         runs = rm.plan(self.entries, 3)
@@ -282,15 +303,15 @@ class Cli(unittest.TestCase):
     def test_summary_estimate(self):
         rc, out = self.run_cli("summary", "--repeats", "6", "--duration", "3m")
         self.assertEqual(rc, 0)
-        self.assertIn("scenarios=23", out)
-        self.assertIn("runs=138", out)
-        self.assertIn("est_minutes=552", out)  # 138 * (3 + 1)
+        self.assertIn("scenarios=31", out)
+        self.assertIn("runs=186", out)
+        self.assertIn("est_minutes=744", out)  # 186 * (3 + 1)
 
     def test_plan_tsv_shape(self):
         rc, out = self.run_cli("plan", "--tier", "tier1", "--repeats", "1")
         self.assertEqual(rc, 0)
         lines = out.strip().splitlines()
-        self.assertEqual(len(lines), 8)
+        self.assertEqual(len(lines), 10)
         for line in lines:
             cols = line.split("\t")
             self.assertEqual(len(cols), 6)          # round, scenario, fixture, load, key, status

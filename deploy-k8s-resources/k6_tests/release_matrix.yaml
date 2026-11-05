@@ -13,11 +13,13 @@
 #              Order inside a group rotates every round (A B | B A | A B ...).
 #   tier1      true => also part of the cheap per-build Tier 1 set.
 #              Tier 2 (per release) is every enabled entry.
-#   enabled    false => not part of the default plan. Switch it to true once it has run
-#              cleanly on a cluster.
-#   pending    free text: why it is not enabled yet. An entry with a `pending` note can
-#              still be planned for the first cluster smoke run with INCLUDE_PENDING=true
+#   enabled    false => not part of the default plan. A new entry starts as enabled: false and is
+#              switched to true once it has run cleanly on a cluster.
+#   pending    free text: why it is not enabled yet. An entry with a `pending` note can still be
+#              planned for its first cluster smoke run with INCLUDE_PENDING=true
 #              (e.g. TIER=tier1 INCLUDE_PENDING=true REPEATS=1 ./run_release_baseline.sh).
+#              No entry is pending at the moment: the eight added with the HTTP-entry / churn /
+#              disconnect work all ran cleanly on the cluster (2026-11-05) and are enabled.
 #
 # The result key (log file / metrics.json name) is derived exactly as before:
 #   fixture == short -> <scenario>      otherwise -> <scenario>__<fixture>
@@ -32,7 +34,7 @@ entries:
 
   # token chat: gateway vs direct (and the gateway entered over plain HTTP, to split out the TLS cost)
   - {scenario: token-chat-openai,         fixture: short,  load: 50, track: core, group: overhead-token-short}
-  - {scenario: token-chat-openai-http,    fixture: short,  load: 50, track: core, group: overhead-token-short, enabled: false, pending: "HTTP entry: implemented, verified locally; needs a cluster smoke run (INCLUDE_PENDING=true)"}
+  - {scenario: token-chat-openai-http,    fixture: short,  load: 50, track: core, group: overhead-token-short}
   - {scenario: direct-token-chat-openai,  fixture: short,  load: 50, track: core, group: overhead-token-short}
 
   - {scenario: token-chat-openai,         fixture: medium, load: 50, track: core, group: overhead-token-medium}
@@ -43,11 +45,11 @@ entries:
   - {scenario: direct-stream-openai,      fixture: short,  load: 30, track: core, group: overhead-stream-openai-short, tier1: true}
 
   - {scenario: stream-gemini,             fixture: short,  load: 30, track: core, group: overhead-stream-gemini-short}
-  - {scenario: direct-stream-gemini,      fixture: short,  load: 30, track: core, group: overhead-stream-gemini-short, enabled: false, pending: "implemented, verified locally; needs a cluster smoke run (INCLUDE_PENDING=true)"}
+  - {scenario: direct-stream-gemini,      fixture: short,  load: 30, track: core, group: overhead-stream-gemini-short}
 
   # embeddings
   - {scenario: embeddings-openai,         fixture: short,  load: 50, track: core, group: overhead-embeddings-short}
-  - {scenario: embeddings-openai-http,    fixture: short,  load: 50, track: core, group: overhead-embeddings-short, enabled: false, pending: "HTTP entry: implemented, verified locally; needs a cluster smoke run (INCLUDE_PENDING=true)"}
+  - {scenario: embeddings-openai-http,    fixture: short,  load: 50, track: core, group: overhead-embeddings-short}
   - {scenario: direct-embeddings-openai,  fixture: short,  load: 50, track: core, group: overhead-embeddings-short}
 
   - {scenario: embeddings-openai,         fixture: medium, load: 50, track: core, group: overhead-embeddings-medium}
@@ -61,18 +63,18 @@ entries:
   - {scenario: payload-logging,           fixture: short,  load: 25, track: core}
 
   # fault-style cases (first batch): connection churn and client disconnect
-  - {scenario: token-chat-openai-churn,      fixture: short, load: 50, track: core, group: churn-token, enabled: false, pending: "connection churn: implemented, verified locally; needs a cluster smoke run (INCLUDE_PENDING=true)"}
-  - {scenario: token-chat-openai-http-churn, fixture: short, load: 50, track: core, group: churn-token, enabled: false, pending: "connection churn over HTTP: implemented, verified locally; needs a cluster smoke run (INCLUDE_PENDING=true)"}
-  - {scenario: stream-openai-disconnect,     fixture: short, load: 30, track: core, enabled: false, pending: "client disconnect: implemented, verified locally; needs a cluster smoke run (INCLUDE_PENDING=true)"}
+  - {scenario: token-chat-openai-churn,      fixture: short, load: 50, track: core, group: churn-token}
+  - {scenario: token-chat-openai-http-churn, fixture: short, load: 50, track: core, group: churn-token}
+  - {scenario: stream-openai-disconnect,     fixture: short, load: 30, track: core}
 
   # ---- mlflow50 fixed-delay track (gateway-overhead gating) ----------------
   - {scenario: token-chat-openai,         fixture: mlflow50, load: 50, track: mlflow50, group: overhead-token-mlflow50, tier1: true}
-  - {scenario: token-chat-openai-http,    fixture: mlflow50, load: 50, track: mlflow50, group: overhead-token-mlflow50, tier1: true, enabled: false, pending: "HTTP entry: implemented, verified locally; needs a cluster smoke run (INCLUDE_PENDING=true)"}
+  - {scenario: token-chat-openai-http,    fixture: mlflow50, load: 50, track: mlflow50, group: overhead-token-mlflow50, tier1: true}
   - {scenario: direct-token-chat-openai,  fixture: mlflow50, load: 50, track: mlflow50, group: overhead-token-mlflow50, tier1: true}
 
   - {scenario: stream-openai,             fixture: mlflow50, load: 30, track: mlflow50, group: overhead-stream-mlflow50, tier1: true}
   - {scenario: direct-stream-openai,      fixture: mlflow50, load: 30, track: mlflow50, group: overhead-stream-mlflow50, tier1: true}
 
   - {scenario: embeddings-openai,         fixture: mlflow50, load: 50, track: mlflow50, group: overhead-embeddings-mlflow50, tier1: true}
-  - {scenario: embeddings-openai-http,    fixture: mlflow50, load: 50, track: mlflow50, group: overhead-embeddings-mlflow50, tier1: true, enabled: false, pending: "HTTP entry: implemented, verified locally; needs a cluster smoke run (INCLUDE_PENDING=true)"}
+  - {scenario: embeddings-openai-http,    fixture: mlflow50, load: 50, track: mlflow50, group: overhead-embeddings-mlflow50, tier1: true}
   - {scenario: direct-embeddings-openai,  fixture: mlflow50, load: 50, track: mlflow50, group: overhead-embeddings-mlflow50, tier1: true}

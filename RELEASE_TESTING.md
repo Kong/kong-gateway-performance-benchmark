@@ -80,7 +80,8 @@ Entries marked `enabled: false` are implemented but stay out of the default plan
 cluster. `INCLUDE_PENDING=true` plans them for that smoke run — `TIER=tier1 INCLUDE_PENDING=true REPEATS=1
 ./run_release_baseline.sh` — and then they are switched to `enabled: true` in the matrix.
 
-Scenarios behind that switch (all verified locally against the fake provider, not yet on a cluster):
+Scenarios added with the HTTP-entry / churn / disconnect work (they ran cleanly on the cluster on 2026-11-05 and are
+part of the default plan; a future new entry starts disabled and goes through the same smoke run):
 - `token-chat-openai-http`, `embeddings-openai-http` — the same routes entered over plain HTTP. HTTPS − HTTP is the
   TLS cost of the client hop; HTTP − direct is the pure gateway overhead.
 - `direct-stream-gemini` — the direct control for `stream-gemini`.
@@ -188,6 +189,17 @@ heuristic (`BUFFERS_STREAM_START`, `DELAYS_FIRST_BYTES_ONLY`, `ADDS_LATENCY`, `N
 evidence. Run it through `kubectl port-forward` (see the header of the script); absolute times include the
 port-forward hop, the first-event delta and the burst size are what matter. It is the way to find out why
 `stream-openai` shows a TTFT of ~524 ms while `stream-gemini` shows ~123 ms with the same upstream settings.
+
+**Result on the cluster (2026-11-05, run from a pod, 9 requests per target).** With the routes as committed — Kong's
+default `response_buffering: true` — the gateway does not stream: over HTTPS all 18 events arrive in one burst at
+~1325 ms (the length of the whole stream) while the direct upstream delivers the first one at 121 ms; over HTTP they
+arrive in groups of ~4 (first event at ~363 ms). The TTFT k6 reports is the arrival of the response HEADERS, not of
+the first token. With `response_buffering: false` on the streaming routes the gateway matches the direct path
+(+1 ms OpenAI, +3 ms Gemini; events 80 ms apart, burst of 1). Running the diagnostic through `kubectl port-forward`
+shows the same burst shape, but its first-event deltas are not usable: the tunnel set-up cost differs per target.
+The streaming scenarios of every release so far therefore measured a buffered response; whether to set
+`response_buffering: false` on those routes is a decision about what the benchmark should measure, and it makes
+new stream results incomparable with the old ones.
 
 ## When a regression fires
 1. The report's escalation list names exactly what regressed (scenario, metric, Δ%, limit).
