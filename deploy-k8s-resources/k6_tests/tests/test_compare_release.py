@@ -448,6 +448,26 @@ class Confirmation(Base):
         self.assertEqual(rc, 1)
 
 
+class VerdictJson(Base):
+    def test_overhead_budgets_are_exported_for_reports(self):
+        spec = pair("token-chat-openai", "direct-token-chat-openai")
+        _, v, _ = self.run_cmp(self.release("cur", spec), self.release("base", spec))
+        self.assertEqual(v["overhead_budgets"], {"p95_ms": 5.0, "p99_ms": 10.0, "ttft_p95_ms": 20.0})
+        _, first, _ = self.run_cmp(self.release("cur2", spec))
+        self.assertEqual(first["overhead_budgets"], v["overhead_budgets"])
+
+    def test_budgets_are_null_for_a_config_without_overhead_slo(self):
+        legacy = {k: val for k, val in SLO.items() if k not in ("overhead_slo", "legacy_absolute_latency_slo")}
+        spec = pair("token-chat-openai", "direct-token-chat-openai")
+        _, v, _ = self.run_cmp(self.release("cur", spec), self.release("base", spec), slo=legacy)
+        self.assertIsNone(v["overhead_budgets"])
+
+    def test_budget_overrides_in_the_config_are_reflected(self):
+        slo = {**SLO, "overhead_slo": {**SLO["overhead_slo"], "budget_p95_ms": 7.5}}
+        _, v, _ = self.run_cmp(self.release("cur", pair("token-chat-openai", "direct-token-chat-openai")), slo=slo)
+        self.assertEqual(v["overhead_budgets"]["p95_ms"], 7.5)
+
+
 class FirstRelease(Base):
     def test_no_baseline_records_and_keeps_both_verdict_keys(self):
         cur = self.release("cur", pair("token-chat-openai", "direct-token-chat-openai", overhead=1.0))

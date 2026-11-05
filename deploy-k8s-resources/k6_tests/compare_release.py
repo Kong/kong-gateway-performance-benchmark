@@ -303,6 +303,15 @@ def overhead_budget(slo_cfg, row, metric):
     return cfg.get(key, DEFAULT_OVERHEAD_BUDGET_MS[metric])
 
 
+def effective_overhead_budgets(slo_cfg):
+    """The default overhead budgets in force (ms), or None when the config has no
+    overhead_slo section. Written to verdict.json so reports can colour the numbers."""
+    cfg = slo_cfg.get("overhead_slo")
+    if cfg is None:
+        return None
+    return {m: cfg.get(BUDGET_KEY[m], DEFAULT_OVERHEAD_BUDGET_MS[m]) for m in BUDGET_KEY}
+
+
 def evaluate_overhead_slo(rows, slo_cfg):
     if "overhead_slo" not in slo_cfg:
         return []
@@ -728,6 +737,7 @@ def main(argv=None):
                 "absolute_slo_violations": absolute_slo_violations,
                 "gateway_overhead_estimates": paired,
                 "derived_overhead": res["derived_overhead"],
+                "overhead_budgets": effective_overhead_budgets(slo_cfg),
             }, indent=2))
         return 1 if absolute_slo_violations else 0
 
@@ -813,6 +823,7 @@ def main(argv=None):
             "gateway_overhead_estimates": paired,
             "derived_overhead": res["derived_overhead"],
             "overhead_checks": res["overhead_checks"],
+            "overhead_budgets": effective_overhead_budgets(slo_cfg),
             "environment": drift,
         }, indent=2))
 
