@@ -197,9 +197,15 @@ arrive in groups of ~4 (first event at ~363 ms). The TTFT k6 reports is the arri
 the first token. With `response_buffering: false` on the streaming routes the gateway matches the direct path
 (+1 ms OpenAI, +3 ms Gemini; events 80 ms apart, burst of 1). Running the diagnostic through `kubectl port-forward`
 shows the same burst shape, but its first-event deltas are not usable: the tunnel set-up cost differs per target.
-The streaming scenarios of every release so far therefore measured a buffered response; whether to set
-`response_buffering: false` on those routes is a decision about what the benchmark should measure, and it makes
-new stream results incomparable with the old ones.
+The streaming scenarios of every release up to 2026-11-05 therefore measured a buffered response.
+
+**Decision (2026-11-05): the streaming routes carry `response_buffering: false`** (`kong-full.yaml` and
+`build_declarative.py`; every other route keeps Kong's default). An A/B on the cluster (3 repeats per config)
+showed the same total duration, errors, usage in the final event and client-disconnect propagation, and the k6
+TTFT of `stream-openai` going from 524 ms to 123 ms (= direct). Consequences: streaming results recorded before
+this change are **not comparable** with new ones (the k6 TTFT is the arrival of the headers, and CPU per request
+may differ), so rebuild the baseline for `stream-*` before gating them; `env.json` carries a hash of the
+declarative config, so the report flags the difference.
 
 ## When a regression fires
 1. The report's escalation list names exactly what regressed (scenario, metric, Δ%, limit).

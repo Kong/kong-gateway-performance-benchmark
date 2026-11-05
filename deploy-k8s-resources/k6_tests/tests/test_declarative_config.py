@@ -58,6 +58,39 @@ class Routes(unittest.TestCase):
         self.assertEqual(len(paths), len(set(paths)))
 
 
+class StreamingRoutes(unittest.TestCase):
+    """Kong buffers the response by default, which delivers a whole SSE stream in one burst at the end. Measured on the
+    cluster: all 18 events arrived at once after ~1325 ms while the direct upstream delivered the first at 121 ms."""
+
+    def test_streaming_routes_do_not_buffer_the_response(self):
+        streaming = [r for r in routes() if "stream" in r["name"]]
+        self.assertGreaterEqual(len(streaming), 2)
+        for r in streaming:
+            self.assertIs(r.get("response_buffering"), False, r["name"])
+
+    def test_other_routes_keep_kongs_default_so_their_results_stay_comparable(self):
+        for r in routes():
+            if "stream" not in r["name"]:
+                self.assertNotIn("response_buffering", r, r["name"])
+
+    def test_the_generator_sets_it_too_so_a_regeneration_does_not_lose_it(self):
+        text = (K6_TESTS.parent / "kong_helm" / "declarative" / "build_declarative.py").read_text()
+        self.assertIn('route["response_buffering"] = False', text)
+        self.assertIn('"stream" in meta["name"]', text)
+
+    def test_every_streaming_scenario_goes_through_a_route_that_streams(self):
+        urls = scenario_urls()
+        streaming_paths = [p for r in routes() if r.get("response_buffering") is False for p in r["paths"]]
+        checked = 0
+        for e in rm.load_matrix(K6_TESTS / "release_matrix.yaml"):
+            if "stream" in e["scenario"] and e["scenario"] in urls:       # gateway streaming scenarios
+                checked += 1
+                path = urls[e["scenario"]][1]
+                self.assertTrue(any(path.startswith(sp) for sp in streaming_paths),
+                                f"{e['scenario']} requests {path}, which no non-buffering route serves")
+        self.assertGreaterEqual(checked, 3)       # stream-openai, stream-gemini, stream-openai-disconnect
+
+
 class ScenarioPaths(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

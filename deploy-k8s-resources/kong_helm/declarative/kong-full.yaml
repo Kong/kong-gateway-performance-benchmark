@@ -82,6 +82,7 @@ services:
     protocols:
     - http
     - https
+    response_buffering: false
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -118,6 +119,7 @@ services:
     protocols:
     - http
     - https
+    response_buffering: false
     plugins:
     - name: ai-proxy-advanced
       config:

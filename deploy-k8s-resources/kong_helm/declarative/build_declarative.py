@@ -64,18 +64,24 @@ def main():
                         "config": plugins[pn]["config"],
                     })
 
+                route = {
+                    "name": meta["name"],
+                    "paths": [path],
+                    "strip_path": strip_path,
+                    # A route without `protocols` was loaded as https-only by this Kong image, so plain
+                    # HTTP got 426; the HTTP-entry scenarios (TLS cost split) need both.
+                    "protocols": ["http", "https"],
+                    "plugins": route_plugins,
+                }
+                if "stream" in meta["name"]:
+                    # Kong buffers the response by default, which delivers a whole SSE stream in one burst at
+                    # the end: clients get no token until the stream is over and the k6 TTFT is the arrival of
+                    # the headers, not of the first token. Streaming routes must not buffer.
+                    route["response_buffering"] = False
                 services.append({
                     "name": meta["name"],
                     "url": url,
-                    "routes": [{
-                        "name": meta["name"],
-                        "paths": [path],
-                        "strip_path": strip_path,
-                        # A route without `protocols` was loaded as https-only by this Kong image, so plain
-                        # HTTP got 426; the HTTP-entry scenarios (TLS cost split) need both.
-                        "protocols": ["http", "https"],
-                        "plugins": route_plugins,
-                    }],
+                    "routes": [route],
                 })
 
     out = {"_format_version": "3.0", "services": services}
