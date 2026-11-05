@@ -173,7 +173,7 @@ check_pod_health() {
   for ns in "${namespaces[@]}"; do
     # Check for pods not in Running/Succeeded state
     local unhealthy
-    unhealthy=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | grep -v -E 'Running|Succeeded|Completed' | wc -l | tr -d ' ')
+    unhealthy=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | { grep -v -E 'Running|Succeeded|Completed' || true; } | wc -l | tr -d ' ')
     
     if [[ "$unhealthy" -gt 0 ]]; then
       log_error "Found $unhealthy unhealthy pods in namespace '$ns'"
@@ -269,7 +269,7 @@ check_no_active_benchmarks() {
   log_info "Checking for active benchmark runs..."
   
   local active_testruns
-  active_testruns=$(kubectl get testrun -n k6 --no-headers 2>/dev/null | grep -v -E 'finished|completed|error' | wc -l | tr -d ' ')
+  active_testruns=$(kubectl get testrun -n k6 --no-headers 2>/dev/null | { grep -v -E 'finished|completed|error' || true; } | wc -l | tr -d ' ')
   
   if [[ "$active_testruns" -gt 0 ]]; then
     log_error "Found $active_testruns active TestRun(s) in k6 namespace"
