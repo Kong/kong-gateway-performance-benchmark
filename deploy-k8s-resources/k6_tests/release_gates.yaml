@@ -19,6 +19,16 @@ defaults:
   ttft_p95_ms:    { warn_pct: 5,  fail_pct: 15 }   # streaming only
   throughput_rps: { warn_pct: 5,  fail_pct: 10 }   # drop beyond this = regression
   error_rate_pct: { warn_abs: 0.5, fail_abs: 1.0 } # absolute points, not %
+  cpu_seconds_per_1k_req: { warn_pct: 10, fail_pct: 25 }  # Kong CPU per 1k requests; only checked when both runs carry infra data
+
+# Gateway overhead (gateway - direct, same-run pairs) now vs the baseline's overhead,
+# in ABSOLUTE milliseconds. At ~1 ms of overhead a percentage gate would be noise.
+# Measured run-to-run spread of the paired overhead: sd 0.07-0.33 ms (p95),
+# 0.1-0.3 ms (p99), 0.06 ms (streaming TTFT). Provisional until an A/A calibration.
+overhead:
+  p95_ms:      { warn_abs_ms: 1.0, fail_abs_ms: 3.0 }
+  p99_ms:      { warn_abs_ms: 2.0, fail_abs_ms: 6.0 }
+  ttft_p95_ms: { warn_abs_ms: 1.0, fail_abs_ms: 3.0 }
 
 # Absolute-noise floor: ignore latency regressions when the metric is tiny.
 # A +15% jump on a 4ms metric (→4.6ms) is noise, not a regression.

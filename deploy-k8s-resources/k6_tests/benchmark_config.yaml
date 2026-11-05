@@ -44,13 +44,50 @@ slo:
   # Maximum p99 latency in milliseconds
   max_p99_latency_ms: 1000
   
-  # Maximum dropped iterations rate (indicates load generator saturation)
-  max_dropped_iterations_rate_percent: 5.0
+  # Maximum dropped iterations rate (indicates load generator saturation).
+  # Enforced on the worst repeat; needs logs that carry dropped_iterations.
+  max_dropped_iterations_rate_percent: 1.0
+
+# -----------------------------------------------------------------------------
+# Gateway-overhead SLO (replaces the absolute latency SLOs)
+# -----------------------------------------------------------------------------
+# The release scenarios run against a fake provider that sleeps for hundreds of
+# milliseconds, so an absolute "p95 < 300 ms" measured the simulated upstream,
+# not the gateway (even the gateway-bypass control paths violated it). The SLO is
+# therefore expressed as a budget on what the gateway ADDS on top of the direct
+# (gateway-bypass) path of the same run:
+#     overhead = gateway - direct      (paired by run number, median)
+# Budgets are provisional until an A/A calibration measures the real noise floor;
+# measured today: p95 ~1 ms, p99 ~1.5 ms, streaming TTFT ~8 ms.
+overhead_slo:
+  budget_p95_ms: 5.0
+  budget_p99_ms: 10.0
+  ttft_budget_p95_ms: 20.0
+  # Per-scenario overrides, by base scenario name or full result key, e.g.
+  #   routing-failover: { budget_p95_ms: 10.0 }
+  scenarios: {}
+  # Scenarios without their own direct control borrow one (same fixture).
+  # null = different upstream (e.g. WireMock): no latency SLO is derived.
+  reference:
+    routing-roundrobin-2: direct-token-chat-openai
+    routing-roundrobin-10: direct-token-chat-openai
+    routing-ewma: direct-token-chat-openai
+    routing-failover: direct-token-chat-openai
+    payload-logging: direct-token-chat-openai
+    static-chat: null
+
+# Set to true to also enforce the old absolute latency thresholds (slo.max_p95/p99
+# below and the per-scenario max_p95/p99/ttft overrides). Left out of this file's
+# defaults on purpose; a config WITHOUT an overhead_slo section behaves as if it
+# were true, so older config files keep their behaviour.
+legacy_absolute_latency_slo: false
 
 # -----------------------------------------------------------------------------
 # Scenario-Specific Overrides
 # -----------------------------------------------------------------------------
 # Different scenarios have different latency expectations.
+# NOTE: the max_p95/p99/ttft values below are only enforced when
+# legacy_absolute_latency_slo is true; see overhead_slo above.
 scenarios:
   token-chat-openai:
     max_p95_latency_ms: 300
