@@ -9,16 +9,32 @@ Every "is it worse?" judgment is relative to a reference. With only **v1** today
 job is to (1) lock a repeatable methodology, (2) capture v1 as the **official baseline**,
 and (3) prove the comparison harness — so future releases are a turnkey diff.
 
-## The three gates
-1. **SLO gate (absolute floor)** — `benchmark_config.yaml`. e.g. p95 < 300 ms regardless. Fails a release on its own.
-2. **Regression gate (relative)** — `release_gates.yaml`. e.g. p95 must not be >15% worse than baseline. This is the new layer.
-3. **Stability gate** — ≥3 repeats, per-metric CV < 15%. A noisy run is `UNSTABLE` → re-run, don't trust/escalate.
+## The gates
+1. **SLO gate (absolute)** — `benchmark_config.yaml`. Error rate, checks pass rate, dropped iterations (worst
+   repeat, ≤ 1%) and the **gateway-overhead budgets** (`overhead_slo`): what the gateway adds over the direct
+   (gateway-bypass) path of the same run — p95 ≤ 5 ms, p99 ≤ 10 ms, streaming TTFT ≤ 20 ms. Fails a release on
+   its own (`ABSOLUTE_SLO_FAIL`). The old absolute latency thresholds measured the fake provider's simulated
+   delay (~614 ms for token chat), not the gateway, so they are off unless `legacy_absolute_latency_slo: true`.
+2. **Regression gate (relative)** — `release_gates.yaml`. Per scenario, p95/p99/TTFT/throughput/error rate vs the
+   baseline, plus the **overhead vs the baseline's overhead, in absolute milliseconds** (p95 +1 ms WARN / +3 ms
+   REGRESSION; p99 +2 / +6; TTFT +1 / +3). A percentage gate cannot see a gateway-overhead regression: +4 ms on a
+   614 ms path is 0.6%.
+3. **Stability gate** — ≥3 repeats, per-metric CV (sample standard deviation) < 15%. A noisy run is `UNSTABLE` →
+   re-run, don't trust/escalate.
+4. **Confirmation (optional)** — `compare_release.py --confirm <second run>`: a REGRESSION/UNSTABLE only counts when
+   the same scenario+metric also flags in the second run.
+
+Statistics: the relative gate uses the **median** across repeats (one cold or noisy run cannot trip it) when both
+runs have per-run statistics, otherwise the mean; the error rate always uses the mean so one bad repeat cannot hide.
+An older baseline is re-aggregated from its per-run logs when they sit next to its `metrics.json`.
 
 Tolerances (defaults, tune with dev): p95 +15%, p99 +20%, TTFT +15%, throughput −10%,
 error-rate +1.0pt. Latency regressions below a 20 ms absolute floor are ignored as noise.
+The overhead budgets and tolerances are provisional until an A/A calibration (the same release twice on the same
+topology) measures the real noise floor; so far the paired p95 overhead has a run-to-run sd of 0.07–0.33 ms.
 
 ## Standard run profile
-Fixed so every release is apples-to-apples. Defined in `run_release_baseline.sh`:
+Fixed so every release is apples-to-apples. Defined in `release_matrix.yaml` (read by `run_release_baseline.sh`):
 
 | Scenario | Load |
 |---|---|
@@ -29,14 +45,42 @@ Fixed so every release is apples-to-apples. Defined in `run_release_baseline.sh`
 `REPEATS=3`, `DURATION=3m` (raise to 5–6 m for the official record once dev signs off on
 the load profile). Same cluster, isolated node groups (loadgen/kong/support).
 
+## Run matrix, tiers and ordering
+The scenario list lives in `deploy-k8s-resources/k6_tests/release_matrix.yaml`; `release_matrix.py` plans the runs.
+
+| Tier | Contents | When |
+|---|---|---|
+| `tier1` | cheap subset: the gateway/direct overhead pairs | every build |
+| `tier2` (default) | every enabled entry | every release |
+
+Entries marked `enabled: false` are planned but not runnable yet (each carries a `pending` note).
+
+- `ORDER=interleaved` (default): every round runs every scenario once, then the next round. Gateway/direct pairs run
+  back-to-back and swap order each round, so slow environment drift cancels out of the pair difference, and an
+  interrupted run leaves every scenario with the same number of repeats. `ORDER=shuffle` (seeded by `SEED`) shuffles
+  the group order; `ORDER=sequential` is the legacy order.
+- `DRY_RUN=true` prints the plan and a time estimate (each run ≈ `DURATION` + ~1 min) without touching the cluster.
+- The executed order is saved as `plan.tsv` in the results directory.
+- No warm-up is discarded: at 50 RPS the first repeat differs from the later ones by < 0.5 ms, so every repeat
+  counts. A k6 warm-up is planned for high-load tests only.
+
+```bash
+cd deploy-k8s-resources/k6_tests
+TIER=tier1 REPEATS=3 DRY_RUN=true VERSION=ai-x ./run_release_baseline.sh   # preview the plan
+python3 -m unittest discover -s tests                                       # planner / aggregator / gate tests
+```
+
 ## Capturing a release
 ```bash
 cd deploy-k8s-resources/k6_tests
 VERSION=ai-2.0.0-rc.2 ./run_release_baseline.sh
 ```
 Produces `results/releases/<version>_<date>/`:
-- `*__run<N>.log` — raw k6 summary per repeat (evidence)
-- `metrics.json` — aggregated means + per-metric CV
+- `*__run<N>.log` — raw k6 summary per repeat (evidence): latency avg/med/p90/p95/p99/max, rate, errors,
+  dropped iterations, status / error counts
+- `plan.tsv` — the order in which the runs were executed
+- `metrics.json` (schema 2) — means + CV (sample stdev) per gate metric, plus median/IQR/stdev/min/max,
+  `dropped_pct`, `status_totals` and the raw `per_run` values
 - `summary.csv` — flat table for spreadsheets/sign-off
 - `report.md` — human-readable evidence report
 - `verdict.json` — machine verdict (for CI)
@@ -52,10 +96,22 @@ python3 compare_release.py \
   --baseline results/releases/ai-2.0.0-rc.2_2026-06-16 \
   --out report.md --json verdict.json
 ```
-Exit code: `0` = PASS/WARN, `1` = REGRESSION or UNSTABLE → fail the release pipeline.
+Exit code: `0` = PASS/WARN, `1` = REGRESSION, UNSTABLE or ABSOLUTE_SLO_FAIL → fail the release pipeline.
 
 `report.md` leads with a per-scenario verdict table (✅ OK / ⚠️ WARN / ❌ REGRESSION /
 🌀 UNSTABLE) and an escalation list naming the offending scenario+metric.
+
+## Reading the gateway-overhead table
+`report.md` and the PDF list, per gateway scenario, `overhead = gateway − direct` as the **median of the per-round
+differences** (the gateway and direct runs of one round run back-to-back), with a bootstrap 95% CI. Scenarios without
+their own direct control (routing, payload logging) are compared with the same-fixture `direct-token-chat-openai` and
+listed separately.
+
+Caveat: the gateway path is HTTPS (TLS terminated at Kong, certificate verification skipped) while the direct path is
+plain HTTP, so the overhead includes the TLS cost of the client hop until the HTTP-entry variants are measured.
+
+When an `env.json` sits in both results directories it is compared: drift in instance types, k6 version, config hashes
+or in whether each node shares Kong's availability zone is reported, but does not change the verdict.
 
 ## When a regression fires
 1. The report's escalation list names exactly what regressed (scenario, metric, Δ%, limit).
@@ -76,6 +132,9 @@ echo '{"dir":"results/releases/<blessed>_<date>","version":"<blessed>"}' \
 - `run_release_baseline.sh` — capture orchestrator (matrix × repeats → aggregate → report)
 - `aggregate_release.py` — parse k6 summaries → metrics.json + summary.csv
 - `compare_release.py` — regression gate → report.md + verdict.json (exit 1 on regression)
-- `release_gates.yaml` — relative tolerances + stability gate
-- `benchmark_config.yaml` — absolute SLO floors (existing)
+- `release_matrix.yaml` / `release_matrix.py` — scenario matrix, tiers, pairing and run order
+- `release_gates.yaml` — relative tolerances, overhead tolerances + stability gate
+- `benchmark_config.yaml` — absolute SLOs (error rate, checks, dropped iterations) and the gateway-overhead
+  budgets (`overhead_slo`)
+- `tests/` — unit and golden tests: `python3 -m unittest discover -s tests`
 - `results/releases/` — versioned evidence store; `baseline.json` is the reference pointer

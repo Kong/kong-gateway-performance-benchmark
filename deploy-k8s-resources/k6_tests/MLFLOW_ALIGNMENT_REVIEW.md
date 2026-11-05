@@ -50,5 +50,15 @@ This document reviews the Kong AI Gateway benchmark suite against the methodolog
 - [x] Preserve per-run driver logs in release output
 - [x] Add direct-upstream overhead scenario pair
 - [x] Add mlflow50 fixed-delay release track (gateway/direct pairs)
-- [ ] Add robust statistics (median/IQR/CI)
+- [x] Add robust statistics (median/IQR/sample stdev in metrics.json; gate on the median; bootstrap CI on the paired gateway overhead)
 - [x] Expand release fixture matrix
+- [x] Gate on gateway overhead (gateway - direct, paired by run) instead of absolute latency
+- [x] Four-layer verdict inputs: correctness (checks/errors/dropped), overhead SLO, relative regression, stability confidence
+- [x] Run matrix in release_matrix.yaml with interleaved, pair-adjacent execution
+
+## Update — gateway-overhead SLO
+
+The absolute p95/p99 SLOs measured the fake provider's simulated delay (~614 ms for token chat), so even the
+gateway-bypass control paths violated them and every release ended `ABSOLUTE_SLO_FAIL`. The latency SLO is now a
+budget on what the gateway adds over the direct path of the same run (`overhead_slo` in `benchmark_config.yaml`;
+the old thresholds only apply with `legacy_absolute_latency_slo: true`). See `RELEASE_TESTING.md`.

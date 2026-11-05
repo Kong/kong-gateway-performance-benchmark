@@ -17,14 +17,18 @@ global:
   min_repeats: 3
   
   # Maximum coefficient of variation (CV) for key metrics before flagging
-  # instability. CV = stddev / mean × 100. Values above this suggest
-  # environmental noise or inconsistent behavior.
+  # instability. CV = sample standard deviation / mean × 100. Values above this
+  # suggest environmental noise or inconsistent behavior.
   max_coefficient_of_variation_percent: 15.0
   
-  # Warmup and steady-state windows (future: k6 scenarios will respect these)
-  warmup_duration: 30s
-  steady_state_duration: 5m
-  cooldown_duration: 30s
+  # Run windows. NOT read by any script today: the release runner takes the run
+  # length from DURATION (default 3m) and runs without a warm-up, because the
+  # measured difference between the first and the later repeats at 50 RPS is
+  # below 0.5 ms. These values document what the release profile actually uses;
+  # a k6 warm-up is planned for the high-load (breakpoint) tests only.
+  warmup_duration: 0s
+  steady_state_duration: 3m
+  cooldown_duration: 0s
 
 # -----------------------------------------------------------------------------
 # Service Level Objectives (SLOs) — Hard Gates
