@@ -23,6 +23,9 @@
 #   SEED=1                  RNG seed for ORDER=shuffle.
 #   MATRIX_FILE=PATH        alternative matrix file.
 #   INCLUDE_MLFLOW50_TRACK  true (default) | false.
+#   INCLUDE_PENDING=true    also run the entries that are implemented but not enabled yet
+#                           (cluster smoke run for new scenarios), e.g.
+#                             TIER=tier1 INCLUDE_PENDING=true REPEATS=1 ./run_release_baseline.sh
 #   DRY_RUN=true            print the plan and the time estimate, run nothing
 #                           (no cluster access, no output directory).
 # =============================================================================
@@ -34,6 +37,7 @@ VERSION="${VERSION:-unknown}"
 REPEATS="${REPEATS:-3}"
 DURATION="${DURATION:-3m}"
 INCLUDE_MLFLOW50_TRACK="${INCLUDE_MLFLOW50_TRACK:-true}"
+INCLUDE_PENDING="${INCLUDE_PENDING:-false}"
 TIER="${TIER:-tier2}"
 ORDER="${ORDER:-interleaved}"
 SEED="${SEED:-1}"
@@ -68,7 +72,8 @@ fi
 # Build the ordered run plan: one TSV line per run
 #   round <TAB> scenario <TAB> fixture <TAB> load <TAB> result-key
 PLAN_ARGS=(--matrix "$MATRIX_FILE" --tier "$TIER" --repeats "$REPEATS"
-           --include-mlflow50 "$INCLUDE_MLFLOW50_TRACK" --order "$ORDER" --seed "$SEED")
+           --include-mlflow50 "$INCLUDE_MLFLOW50_TRACK" --include-pending "$INCLUDE_PENDING"
+           --order "$ORDER" --seed "$SEED")
 if ! PLAN_TEXT=$(python3 release_matrix.py plan "${PLAN_ARGS[@]}"); then
   echo "ERROR: could not build the run plan from $MATRIX_FILE" >&2
   exit 2
@@ -78,15 +83,16 @@ mapfile -t PLAN <<< "$PLAN_TEXT"
 
 echo "=== Release baseline capture: $VERSION ($REPEATS repeats x $DURATION) -> $OUTDIR ==="
 echo "=== Absolute SLO config: $SLO_CONFIG_FILE ==="
-echo "=== INCLUDE_MLFLOW50_TRACK: $INCLUDE_MLFLOW50_TRACK ==="
+echo "=== INCLUDE_MLFLOW50_TRACK: $INCLUDE_MLFLOW50_TRACK  INCLUDE_PENDING: $INCLUDE_PENDING ==="
 echo "=== Matrix: $MATRIX_FILE ==="
 echo "=== Plan: $SUMMARY (seed=$SEED) ==="
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "=== DRY_RUN: nothing will be executed ==="
   for line in "${PLAN[@]}"; do
-    IFS=$'\t' read -r r scenario fixture load scenario_key <<< "$line"
-    printf '  round %-3s %-44s (%s %s load=%s)\n' "$r" "$scenario_key" "$scenario" "$fixture" "$load"
+    IFS=$'\t' read -r r scenario fixture load scenario_key status <<< "$line"
+    mark=""; [[ "$status" == "pending" ]] && mark="  [pending: not verified on a cluster yet]"
+    printf '  round %-3s %-44s (%s %s load=%s)%s\n' "$r" "$scenario_key" "$scenario" "$fixture" "$load" "$mark"
   done
   exit 0
 fi
@@ -99,13 +105,37 @@ printf '%s\n' "${PLAN[@]}" > "$OUTDIR/plan.tsv"
 # p90/p95/p99 and avg/med/max latency, achieved rate, failures, checks, TTFT,
 # iterations + dropped_iterations (the "iterations total" alternative matches
 # both), and the HTTP status / error taxonomy.
-RUN_LOG_PATTERN='AI benchmark summary|http_req_duration (avg|med|p90|p95|p99|max)|http_reqs/s|http_req_failed|checks pass|ai_time_to_first_token_ms p95|iterations total|http status counts'
+RUN_LOG_PATTERN='AI benchmark summary|http_req_duration (avg|med|p90|p95|p99|max)|http_reqs/s|http_req_failed|checks pass|ai_time_to_first_token_ms p95|iterations total|http status counts|disconnect as intended|stream finished before disconnect'
+
+# Client-disconnect scenarios: the interesting numbers are on the upstream side. The fake provider
+# counts started / completed / aborted responses; reset them before the run, read them after it.
+fake_provider_stats() {  # $1: "" -> read, "/reset" -> zero the counters
+  kubectl exec -n upstream deploy/fake-provider -- wget -qO- "http://127.0.0.1:8080/__stats$1" 2>/dev/null
+}
+
+record_upstream_stats() {  # $1: per-run log to append the "upstream stats:" line to
+  local json line
+  sleep 3   # let streams that were not cancelled finish, so they show up as completed
+  json=$(fake_provider_stats "") || json=""
+  line=$(python3 - "$json" <<'PY'
+import json, sys
+try:
+    d = json.loads(sys.argv[1])
+    print("upstream stats: " + " ".join(f"{k}={int(d[k])}" for k in ("started", "completed", "aborted", "active")))
+except Exception:
+    sys.exit(1)
+PY
+) && echo "$line" >> "$1" && echo "    $line" || echo "    WARNING: could not read the fake provider stats"
+}
 
 run_one() {
   local r="$1" scenario="$2" fixture="$3" load="$4" scenario_key="$5"
   local run_driver_log rp ph
   echo "--- $scenario ($fixture) repeat $r/$REPEATS  (load=$load, $DURATION) ---"
   run_driver_log="$OUTDIR/${scenario_key}__run${r}.driver.log"
+  if [[ "$scenario" == *-disconnect ]]; then
+    fake_provider_stats /reset >/dev/null || echo "    WARNING: could not reset the fake provider stats"
+  fi
   {
     echo "[driver] deleting previous testruns"
     kubectl delete testrun -n k6 --all --ignore-not-found
@@ -127,11 +157,14 @@ run_one() {
     grep -E "$RUN_LOG_PATTERN" \
     > "$OUTDIR/${scenario_key}__run${r}.log"
   echo "    saved $OUTDIR/${scenario_key}__run${r}.log (phase=$ph)"
+  if [[ "$scenario" == *-disconnect ]]; then
+    record_upstream_stats "$OUTDIR/${scenario_key}__run${r}.log"
+  fi
 }
 
 current_round=0
 for line in "${PLAN[@]}"; do
-  IFS=$'\t' read -r r scenario fixture load scenario_key <<< "$line"
+  IFS=$'\t' read -r r scenario fixture load scenario_key status <<< "$line"
   if [[ "$r" != "$current_round" ]]; then
     current_round="$r"
     echo "=== Round $r/$REPEATS ==="

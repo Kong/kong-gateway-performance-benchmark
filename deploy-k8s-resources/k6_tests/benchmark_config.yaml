@@ -48,6 +48,11 @@ slo:
   # Maximum p99 latency in milliseconds
   max_p99_latency_ms: 1000
   
+  # Client-disconnect scenarios (*-disconnect): minimum share of client hang-ups that must reach
+  # the upstream as an aborted response. Below it, the gateway keeps streaming for clients that
+  # are gone. Needs the fake provider /__stats lines the release runner records.
+  min_disconnect_propagation_percent: 95.0
+
   # Maximum dropped iterations rate (indicates load generator saturation).
   # Enforced on the worst repeat; needs logs that carry dropped_iterations.
   max_dropped_iterations_rate_percent: 1.0

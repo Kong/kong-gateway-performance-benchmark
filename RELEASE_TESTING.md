@@ -11,7 +11,7 @@ and (3) prove the comparison harness — so future releases are a turnkey diff.
 
 ## The gates
 1. **SLO gate (absolute)** — `benchmark_config.yaml`. Error rate, checks pass rate, dropped iterations (worst
-   repeat, ≤ 1%) and the **gateway-overhead budgets** (`overhead_slo`): what the gateway adds over the direct
+   repeat, ≤ 1%), client-disconnect propagation (≥ 95% of hang-ups reach the upstream) and the **gateway-overhead budgets** (`overhead_slo`): what the gateway adds over the direct
    (gateway-bypass) path of the same run — p95 ≤ 5 ms, p99 ≤ 10 ms, streaming TTFT ≤ 20 ms. Fails a release on
    its own (`ABSOLUTE_SLO_FAIL`). The old absolute latency thresholds measured the fake provider's simulated
    delay (~614 ms for token chat), not the gateway, so they are off unless `legacy_absolute_latency_slo: true`.
@@ -53,7 +53,21 @@ The scenario list lives in `deploy-k8s-resources/k6_tests/release_matrix.yaml`; 
 | `tier1` | cheap subset: the gateway/direct overhead pairs | every build |
 | `tier2` (default) | every enabled entry | every release |
 
-Entries marked `enabled: false` are planned but not runnable yet (each carries a `pending` note).
+Entries marked `enabled: false` are implemented but stay out of the default plan until they have run cleanly on a
+cluster. `INCLUDE_PENDING=true` plans them for that smoke run — `TIER=tier1 INCLUDE_PENDING=true REPEATS=1
+./run_release_baseline.sh` — and then they are switched to `enabled: true` in the matrix.
+
+Scenarios behind that switch (all verified locally against the fake provider, not yet on a cluster):
+- `token-chat-openai-http`, `embeddings-openai-http` — the same routes entered over plain HTTP. HTTPS − HTTP is the
+  TLS cost of the client hop; HTTP − direct is the pure gateway overhead.
+- `direct-stream-gemini` — the direct control for `stream-gemini`.
+- `token-chat-openai-churn`, `token-chat-openai-http-churn` — a new TCP (+TLS) connection per request (k6
+  `noConnectionReuse`); churn(HTTPS) − churn(HTTP) is the TLS handshake cost.
+- `stream-openai-disconnect` — the client hangs up mid-stream (`K6_AI_DISCONNECT_AFTER`, default 300 ms). The runner
+  resets the fake provider's `/__stats` before the run and records them after it (`upstream stats:` in the per-run
+  log). The gateway should cancel the upstream: at least 95% of the hang-ups must show up as aborted upstream
+  responses (`slo.min_disconnect_propagation_percent`). If the stats cannot be read the report says the check was
+  not performed instead of passing silently.
 
 - `ORDER=interleaved` (default): every round runs every scenario once, then the next round. Gateway/direct pairs run
   back-to-back and swap order each round, so slow environment drift cancels out of the pair difference, and an

@@ -102,6 +102,58 @@ class RealMatrix(unittest.TestCase):
         self.assertEqual(len(self.tier1), 8)  # 10 once the two HTTP-entry variants are enabled
 
 
+class PendingEntries(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.all = rm.load_matrix(REAL_MATRIX)
+
+    def test_default_plan_excludes_pending_entries(self):
+        keys = {e["key"] for e in rm.select(self.all, "tier2")}
+        for k in ("token-chat-openai-http", "stream-openai-disconnect", "direct-stream-gemini",
+                  "token-chat-openai-churn", "token-chat-openai-http-churn", "embeddings-openai-http"):
+            self.assertNotIn(k, keys)
+
+    def test_include_pending_adds_the_eight_new_scenarios(self):
+        tier2 = rm.select(self.all, "tier2", include_pending=True)
+        self.assertEqual(len(tier2), 31)
+        self.assertEqual(len(rm.select(self.all, "tier1", include_pending=True)), 10)
+        keys = {e["key"] for e in tier2}
+        for k in ("token-chat-openai-http", "token-chat-openai-http__mlflow50", "embeddings-openai-http",
+                  "embeddings-openai-http__mlflow50", "direct-stream-gemini", "token-chat-openai-churn",
+                  "token-chat-openai-http-churn", "stream-openai-disconnect"):
+            self.assertIn(k, keys)
+
+    def test_pending_runs_are_flagged_and_enabled_ones_are_not(self):
+        runs = rm.plan(rm.select(self.all, "tier2", include_pending=True), 1)
+        flagged = {r["key"] for r in runs if r["pending"]}
+        self.assertEqual(len(flagged), 8)
+        self.assertTrue(all(not r["pending"] for r in runs if r["key"] not in flagged))
+
+    def test_http_variant_joins_its_overhead_group_and_runs_adjacent(self):
+        runs = rm.plan(rm.select(self.all, "tier2", include_pending=True), 1)
+        seq = [r["key"] for r in runs]
+        i = seq.index("token-chat-openai")
+        self.assertEqual(set(seq[i:i + 3]), {"token-chat-openai", "token-chat-openai-http", "direct-token-chat-openai"})
+
+    def test_a_disabled_entry_without_a_pending_note_is_never_planned(self):
+        p = write_matrix("""
+            entries:
+              - {scenario: a, fixture: short, load: 5, track: core}
+              - {scenario: b, fixture: short, load: 5, track: core, enabled: false}
+              - {scenario: c, fixture: short, load: 5, track: core, enabled: false, pending: "not verified"}
+        """)
+        entries = rm.load_matrix(p)
+        self.assertEqual([e["key"] for e in rm.select(entries, "tier2")], ["a"])
+        self.assertEqual([e["key"] for e in rm.select(entries, "tier2", include_pending=True)], ["a", "c"])
+
+    def test_cli_summary_reports_pending_count_only_when_included(self):
+        rc, out = Cli().run_cli("summary", "--repeats", "3")
+        self.assertNotIn("pending=", out)
+        rc, out = Cli().run_cli("summary", "--repeats", "3", "--include-pending", "true")
+        self.assertIn("scenarios=31", out)
+        self.assertIn("pending=8", out)
+
+
 class Ordering(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -240,7 +292,9 @@ class Cli(unittest.TestCase):
         lines = out.strip().splitlines()
         self.assertEqual(len(lines), 8)
         for line in lines:
-            self.assertEqual(len(line.split("\t")), 5)
+            cols = line.split("\t")
+            self.assertEqual(len(cols), 6)          # round, scenario, fixture, load, key, status
+            self.assertEqual(cols[5], "enabled")
 
 
 if __name__ == "__main__":

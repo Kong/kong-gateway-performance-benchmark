@@ -170,6 +170,39 @@ class AggregateScenario(unittest.TestCase):
         self.assertEqual(a["repeats"], 2)
 
 
+class UpstreamStats(unittest.TestCase):
+    def reps(self, stats_lines):
+        out = []
+        for line in stats_lines:
+            with tempfile.TemporaryDirectory() as d:
+                p = Path(d) / "s-disconnect__run1.log"
+                p.write_text(new_log() + (line + "\n" if line else ""))
+                out.append(ag.parse_log(p))
+        return out
+
+    def test_parse(self):
+        r = self.reps(["upstream stats: started=56 completed=0 aborted=56 active=0"])[0]
+        self.assertEqual(r["upstream"], {"started": 56, "completed": 0, "aborted": 56, "active": 0})
+        self.assertIsNone(self.reps([""])[0]["upstream"])
+
+    def test_totals_and_aborted_pct_over_repeats(self):
+        a = ag.aggregate_scenario(self.reps([
+            "upstream stats: started=100 completed=0 aborted=100 active=0",
+            "upstream stats: started=100 completed=50 aborted=50 active=3"]))
+        t = a["upstream_totals"]
+        self.assertEqual((t["started"], t["completed"], t["aborted"], t["active_max"]), (200, 50, 150, 3))
+        self.assertAlmostEqual(t["aborted_pct"], 75.0)
+
+    def test_null_for_scenarios_without_stats_and_for_zero_started(self):
+        self.assertIsNone(ag.aggregate_scenario(self.reps([""]))["upstream_totals"])
+        zero = ag.aggregate_scenario(self.reps(["upstream stats: started=0 completed=0 aborted=0 active=0"]))
+        self.assertIsNone(zero["upstream_totals"]["aborted_pct"])
+
+    def test_a_repeat_without_stats_does_not_break_the_others(self):
+        a = ag.aggregate_scenario(self.reps(["upstream stats: started=10 completed=0 aborted=10 active=0", ""]))
+        self.assertEqual(a["upstream_totals"]["started"], 10)
+
+
 class PerRun(unittest.TestCase):
     def test_per_run_is_ordered_numerically_and_keeps_raw_values(self):
         with tempfile.TemporaryDirectory() as d:

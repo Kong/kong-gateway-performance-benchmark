@@ -19,6 +19,10 @@ Per scenario, metrics.json holds:
     per repeat, in percent — null when the logs predate that field;
   * status_totals: HTTP status / error counts summed over repeats — null when
     the logs predate that field;
+  * upstream_totals: for client-disconnect scenarios, the fake provider's started /
+    completed / aborted counts summed over repeats (the runner appends an
+    "upstream stats:" line to the per-run log) and aborted_pct = aborted / started;
+    null for every other scenario;
   * per_run: the raw per-repeat values, ordered by run number. compare_release.py
     pairs gateway and direct runs of the same round (they run back-to-back) to
     estimate gateway overhead from paired differences.
@@ -67,6 +71,8 @@ EXTRA_LATENCY_PATTERNS = {
 ITERATIONS_RX = re.compile(r"^iterations total:\s*(\d+)", re.M)
 DROPPED_RX = re.compile(r"^dropped_iterations total:\s*(\d+)", re.M)
 STATUS_RX = re.compile(r"^http status counts:\s*(.+)$", re.M)
+UPSTREAM_RX = re.compile(
+    r"^upstream stats: started=(\d+) completed=(\d+) aborted=(\d+) active=(\d+)", re.M)
 
 STAT_METRICS = list(PATTERNS) + list(EXTRA_LATENCY_PATTERNS)
 
@@ -98,6 +104,10 @@ def parse_log(path):
     else:
         out["dropped_pct"] = None
     out["status"] = parse_status(text)
+    up = UPSTREAM_RX.search(text)
+    out["upstream"] = (
+        dict(zip(("started", "completed", "aborted", "active"), map(int, up.groups()))) if up else None
+    )
     return out
 
 
@@ -175,6 +185,19 @@ def aggregate_scenario(reps):
             for name, count in r["status"].items():
                 totals[name] += count
     agg["status_totals"] = dict(totals) if seen else None
+
+    ups = [r["upstream"] for r in reps if r.get("upstream")]
+    if ups:
+        started = sum(u["started"] for u in ups)
+        agg["upstream_totals"] = {
+            "started": started,
+            "completed": sum(u["completed"] for u in ups),
+            "aborted": sum(u["aborted"] for u in ups),
+            "active_max": max(u["active"] for u in ups),
+            "aborted_pct": round(sum(u["aborted"] for u in ups) / started * 100.0, 3) if started else None,
+        }
+    else:
+        agg["upstream_totals"] = None
     return agg
 
 

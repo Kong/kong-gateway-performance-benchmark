@@ -24,7 +24,7 @@ sequential
 Usage
 -----
     release_matrix.py plan    [--matrix F] [--tier tier1|tier2] [--repeats N]
-                              [--include-mlflow50 true|false]
+                              [--include-mlflow50 true|false] [--include-pending true|false]
                               [--order interleaved|shuffle|sequential]
                               [--seed N] [--format tsv|json]
     release_matrix.py summary [same options] [--duration 3m]
@@ -98,12 +98,15 @@ def load_matrix(path):
     return entries
 
 
-def select(entries, tier="tier2", include_mlflow50=True):
+def select(entries, tier="tier2", include_mlflow50=True, include_pending=False):
+    """Pick the entries to run. Disabled entries that carry a `pending` note are
+    implemented but not yet verified on a cluster; include_pending=True runs them
+    (first cluster smoke run). Disabled entries without a note are never planned."""
     if tier not in TIERS:
         raise MatrixError(f"tier must be one of {TIERS}, got {tier!r}")
     out = []
     for e in entries:
-        if not e["enabled"]:
+        if not e["enabled"] and not (include_pending and e["pending"]):
             continue
         if e["track"] == "mlflow50" and not include_mlflow50:
             continue
@@ -153,7 +156,7 @@ def plan(entries, repeats, order="interleaved", seed=1):
 
 def _run(round_no, e):
     return {"round": round_no, "scenario": e["scenario"], "fixture": e["fixture"],
-            "load": e["load"], "key": e["key"]}
+            "load": e["load"], "key": e["key"], "pending": not e["enabled"]}
 
 
 def parse_duration_minutes(text):
@@ -168,6 +171,8 @@ def _common(ap):
     ap.add_argument("--tier", default="tier2", choices=TIERS)
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--include-mlflow50", default="true", choices=("true", "false"))
+    ap.add_argument("--include-pending", default="false", choices=("true", "false"),
+                    help="also plan entries that are implemented but not yet enabled (cluster smoke run)")
     ap.add_argument("--order", default="interleaved", choices=ORDERS)
     ap.add_argument("--seed", type=int, default=1)
 
@@ -184,7 +189,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     try:
-        entries = select(load_matrix(args.matrix), args.tier, args.include_mlflow50 == "true")
+        entries = select(load_matrix(args.matrix), args.tier, args.include_mlflow50 == "true",
+                         args.include_pending == "true")
         if not entries:
             raise MatrixError("no runnable entries selected")
         runs = plan(entries, args.repeats, args.order, args.seed)
@@ -194,11 +200,14 @@ def main(argv=None):
                 print()
             else:
                 for r in runs:
-                    print("\t".join(str(r[k]) for k in ("round", "scenario", "fixture", "load", "key")))
+                    print("\t".join(str(r[k]) for k in ("round", "scenario", "fixture", "load", "key")),
+                          "pending" if r["pending"] else "enabled", sep="\t")
         else:
             minutes = len(runs) * (parse_duration_minutes(args.duration) + RUN_OVERHEAD_MIN)
+            pending = sum(1 for e in entries if not e["enabled"])
             print(f"tier={args.tier} order={args.order} scenarios={len(entries)} repeats={args.repeats} "
-                  f"runs={len(runs)} duration={args.duration} est_minutes={minutes} est_hours={minutes / 60:.1f}")
+                  f"runs={len(runs)} duration={args.duration} est_minutes={minutes} est_hours={minutes / 60:.1f}"
+                  + (f" pending={pending}" if pending else ""))
     except MatrixError as exc:
         print(f"release_matrix.py: {exc}", file=sys.stderr)
         return 2

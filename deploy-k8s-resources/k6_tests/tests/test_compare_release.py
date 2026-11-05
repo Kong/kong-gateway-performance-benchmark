@@ -48,12 +48,16 @@ def pick(v, r):
 
 def render(spec, r):
     ttft = spec.get("ttft")
-    return LOG.format(
+    text = LOG.format(
         rps=pick(spec.get("rps", 49.9), r), it=pick(spec.get("it", 900), r), dr=pick(spec.get("dr", 0), r),
         p95=pick(spec["p95"], r),
         p99=pick(spec["p99"], r) if "p99" in spec else pick(spec["p95"], r) + 1.0,
         err=pick(spec.get("err", 0.0), r),
         ttft="" if ttft is None else f"ai_time_to_first_token_ms p95: {pick(ttft, r)}\n")
+    if spec.get("upstream"):  # (started, completed, aborted, active), as the runner appends it
+        started, completed, aborted, active = spec["upstream"]
+        text += f"upstream stats: started={started} completed={completed} aborted={aborted} active={active}\n"
+    return text
 
 
 def make_release(root, name, version, scen, repeats=6, strip_stats=False, keep_logs=True, infra=None, env=None):
@@ -466,6 +470,54 @@ class VerdictJson(Base):
         slo = {**SLO, "overhead_slo": {**SLO["overhead_slo"], "budget_p95_ms": 7.5}}
         _, v, _ = self.run_cmp(self.release("cur", pair("token-chat-openai", "direct-token-chat-openai")), slo=slo)
         self.assertEqual(v["overhead_budgets"]["p95_ms"], 7.5)
+
+
+class DisconnectPropagation(Base):
+    def verdict(self, spec, name="cur"):
+        _, v, md = self.run_cmp(self.release(name, {"stream-openai-disconnect": spec}))
+        return v, md
+
+    def test_cancel_reaching_the_upstream_passes(self):
+        v, _ = self.verdict({"p95": 300.0, "upstream": (100, 0, 100, 0)})
+        self.assertEqual([x for x in v["absolute_slo_violations"] if x["metric"] == "disconnect_propagation_pct"], [])
+
+    def test_gateway_that_keeps_streaming_for_a_gone_client_violates_the_slo(self):
+        v, _ = self.verdict({"p95": 300.0, "upstream": (100, 80, 20, 0)})
+        hit = [x for x in v["absolute_slo_violations"] if x["metric"] == "disconnect_propagation_pct"]
+        self.assertEqual(len(hit), 1)
+        self.assertAlmostEqual(hit[0]["actual"], 20.0, places=1)
+        self.assertEqual(hit[0]["threshold"], 95.0)
+        self.assertIn("completed=480", hit[0]["detail"])  # 6 repeats x 80
+        self.assertEqual(v["verdict"], "ABSOLUTE_SLO_FAIL")
+
+    def test_just_above_the_floor_passes_and_just_below_fails(self):
+        ok, _ = self.verdict({"p95": 300.0, "upstream": (1000, 40, 960, 0)}, "ok")      # 96%
+        bad, _ = self.verdict({"p95": 300.0, "upstream": (1000, 60, 940, 0)}, "bad")    # 94%
+        self.assertEqual([x for x in ok["absolute_slo_violations"] if x["metric"] == "disconnect_propagation_pct"], [])
+        self.assertEqual(len([x for x in bad["absolute_slo_violations"] if x["metric"] == "disconnect_propagation_pct"]), 1)
+
+    def test_missing_stats_are_reported_as_not_checked_instead_of_passing_silently(self):
+        _, v, md = self.run_cmp(self.release("cur", {"stream-openai-disconnect": {"p95": 300.0}}),
+                                self.release("base", {"stream-openai-disconnect": {"p95": 300.0}}))
+        self.assertEqual(len(v["notes"]), 1)
+        self.assertIn("stream-openai-disconnect", v["notes"][0])
+        self.assertIn("NOT checked", v["notes"][0])
+        self.assertIn("Not checked", md)
+
+    def test_other_scenarios_are_not_subject_to_the_propagation_floor(self):
+        _, v, _ = self.run_cmp(self.release("cur", {"token-chat-openai": {"p95": 100.0, "upstream": (100, 100, 0, 0)}}))
+        self.assertEqual([x for x in v["absolute_slo_violations"] if x["metric"] == "disconnect_propagation_pct"], [])
+
+    def test_no_floor_in_the_config_means_no_check(self):
+        slo = {**SLO, "slo": {k: val for k, val in SLO["slo"].items() if k != "min_disconnect_propagation_percent"}}
+        _, v, _ = self.run_cmp(self.release("cur", {"stream-openai-disconnect": {"p95": 300.0, "upstream": (100, 100, 0, 0)}}),
+                               slo=slo)
+        self.assertEqual([x for x in v["absolute_slo_violations"] if x["metric"] == "disconnect_propagation_pct"], [])
+
+    def test_intended_hang_ups_do_not_count_as_errors(self):
+        # the k6 script registers status 0 as expected, so error_rate stays 0 for a healthy run
+        v, _ = self.verdict({"p95": 300.0, "err": 0.0, "upstream": (100, 0, 100, 0)})
+        self.assertEqual([x for x in v["absolute_slo_violations"] if x["metric"] == "error_rate_pct"], [])
 
 
 class FirstRelease(Base):

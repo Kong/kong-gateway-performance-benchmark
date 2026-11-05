@@ -63,7 +63,8 @@ RISE_METRICS = LATENCY_METRICS + [CPU_METRIC]
 # Gate on the median across repeats; error rate stays on the mean.
 MEDIAN_METRICS = {"p95_ms", "p99_ms", "ttft_p95_ms", "throughput_rps"}
 GATE_METRICS = ["p95_ms", "p99_ms", "ttft_p95_ms", "throughput_rps", "error_rate_pct", CPU_METRIC]
-EXTRA_STAT_KEYS = ("median", "iqr", "stdev", "min", "max", "per_run", "dropped_pct", "status_totals")
+EXTRA_STAT_KEYS = ("median", "iqr", "stdev", "min", "max", "per_run", "dropped_pct", "status_totals",
+                   "upstream_totals")
 
 # Used only when the SLO config has an overhead_slo section without the value.
 DEFAULT_OVERHEAD_BUDGET_MS = {"p95_ms": 5.0, "p99_ms": 10.0, "ttft_p95_ms": 20.0}
@@ -111,6 +112,8 @@ def scenario_slo_thresholds(slo_cfg, scenario):
     }
     if "max_dropped_iterations_rate_percent" in base:
         thresholds["max_dropped_iterations_rate_percent"] = base["max_dropped_iterations_rate_percent"]
+    if "min_disconnect_propagation_percent" in base:
+        thresholds["min_disconnect_propagation_percent"] = base["min_disconnect_propagation_percent"]
 
     if "max_p95_latency_ms" in overrides:
         thresholds["max_p95_latency_ms"] = overrides["max_p95_latency_ms"]
@@ -403,6 +406,23 @@ def evaluate_absolute_slo(cur_metrics, slo_cfg, overhead_rows_all=None):
                 "detail": f"dropped iterations {dropped:.2f}% (worst repeat) exceeds {limit:.2f}%",
             })
 
+        # Client-disconnect scenarios: after the client hangs up mid-stream the gateway should close the
+        # upstream connection (aborted ~ started). completed ~ started means it kept the upstream busy.
+        floor = th.get("min_disconnect_propagation_percent")
+        up = metric_set.get("upstream_totals")
+        if floor is not None and base_scenario_name(scenario).endswith("-disconnect") and up:
+            pct = up.get("aborted_pct")
+            if pct is not None and pct < floor:
+                violations.append({
+                    "scenario": scenario,
+                    "metric": "disconnect_propagation_pct",
+                    "actual": pct,
+                    "threshold": floor,
+                    "detail": f"only {pct:.1f}% of client disconnects reached the upstream as an abort "
+                              f"(started={up['started']}, completed={up['completed']}, aborted={up['aborted']}); "
+                              f"the gateway keeps streaming for clients that are gone (limit {floor:.0f}%)",
+                })
+
         if legacy_latency:
             p95 = metric_set.get("p95_ms")
             if p95 is not None and p95 > th["max_p95_latency_ms"]:
@@ -546,6 +566,12 @@ def evaluate(cur, base, gates, slo_cfg):
                 res["warnings"].append((c["scenario"], c["metric"], c["delta_str"], c["detail"]))
 
     res["absolute_slo_violations"] = evaluate_absolute_slo(cur, slo_cfg, paired + derived)
+    res["notes"] = [
+        f"`{s}` ran but no upstream stats were recorded, so disconnect propagation was NOT checked "
+        f"(the fake provider /__stats could not be read)"
+        for s, m in cur["scenarios"].items()
+        if base_scenario_name(s).endswith("-disconnect") and not m.get("upstream_totals")
+    ]
     return res
 
 
@@ -795,6 +821,8 @@ def main(argv=None):
         lines += ["", f"**{len(absolute_slo_violations)} absolute SLO violation(s):**"]
         for v in absolute_slo_violations:
             lines.append(f"- `{v['scenario']}` / **{v['metric']}**: {v['detail']}")
+    if res["notes"]:
+        lines += ["", "**Not checked:**"] + [f"- {n}" for n in res["notes"]]
 
     append_overhead_section(lines, res, slo_cfg)
     drift = env_drift(load_env(cur), load_env(base))
@@ -824,6 +852,7 @@ def main(argv=None):
             "derived_overhead": res["derived_overhead"],
             "overhead_checks": res["overhead_checks"],
             "overhead_budgets": effective_overhead_budgets(slo_cfg),
+            "notes": res["notes"],
             "environment": drift,
         }, indent=2))
 
