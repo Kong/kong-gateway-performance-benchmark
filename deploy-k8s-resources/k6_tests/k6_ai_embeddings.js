@@ -7,6 +7,7 @@ import {
   getFixture,
   parseDurationSeconds,
   parseJsonBody,
+  recordStatus,
   renderAiSummary,
 } from './k6_ai_shared.js'
 
@@ -57,6 +58,8 @@ export default function () {
       },
     },
   )
+
+  recordStatus(response)
 
   non200Rate.add(response.status !== 200)
 

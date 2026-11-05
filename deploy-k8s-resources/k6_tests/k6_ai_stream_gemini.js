@@ -7,6 +7,7 @@ import {
   getFixture,
   parseDurationSeconds,
   parseGeminiSseUsage,
+  recordStatus,
   renderAiSummary,
 } from './k6_ai_shared.js'
 
@@ -58,6 +59,8 @@ export default function () {
       },
     },
   )
+
+  recordStatus(response)
 
   non200Rate.add(response.status !== 200)
   // waiting = time to first byte, which approximates TTFT for SSE responses

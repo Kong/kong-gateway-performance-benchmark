@@ -7,6 +7,7 @@ import {
   getFixture,
   parseDurationSeconds,
   parseOpenAiSseUsage,
+  recordStatus,
   renderAiSummary,
 } from './k6_ai_shared.js'
 
@@ -57,6 +58,8 @@ export default function () {
       },
     },
   )
+
+  recordStatus(response)
 
   non200Rate.add(response.status !== 200)
   ttftTrend.add(response.timings.waiting)

@@ -95,6 +95,12 @@ mkdir -p "$OUTDIR"
 # Keep the executed order next to the results as evidence.
 printf '%s\n' "${PLAN[@]}" > "$OUTDIR/plan.tsv"
 
+# Lines of the k6 summary kept in each per-run log (parsed by aggregate_release.py).
+# p90/p95/p99 and avg/med/max latency, achieved rate, failures, checks, TTFT,
+# iterations + dropped_iterations (the "iterations total" alternative matches
+# both), and the HTTP status / error taxonomy.
+RUN_LOG_PATTERN='AI benchmark summary|http_req_duration (avg|med|p90|p95|p99|max)|http_reqs/s|http_req_failed|checks pass|ai_time_to_first_token_ms p95|iterations total|http status counts'
+
 run_one() {
   local r="$1" scenario="$2" fixture="$3" load="$4" scenario_key="$5"
   local run_driver_log rp ph
@@ -118,7 +124,7 @@ run_one() {
   done
   # save this repeat's summary
   kubectl logs -n k6 "$rp" 2>/dev/null | \
-    grep -E "AI benchmark summary|http_req_duration p9|http_reqs/s|http_req_failed|checks pass|ai_time_to_first_token_ms p95" \
+    grep -E "$RUN_LOG_PATTERN" \
     > "$OUTDIR/${scenario_key}__run${r}.log"
   echo "    saved $OUTDIR/${scenario_key}__run${r}.log (phase=$ph)"
 }

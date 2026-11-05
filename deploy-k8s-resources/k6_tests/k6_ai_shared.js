@@ -1,4 +1,5 @@
 import { SharedArray } from 'k6/data'
+import { Counter } from 'k6/metrics'
 
 const fixtureData = new SharedArray('ai-benchmark-fixtures', () => [JSON.parse(open('./ai_benchmark_fixtures.json'))])[0]
 
@@ -14,6 +15,46 @@ export function getFixture(group, tier) {
   }
 
   return fixture
+}
+
+// ---------------------------------------------------------------------------
+// Response taxonomy. Call recordStatus(response) once per request so the run
+// summary can say *what kind* of failures happened, not just how many:
+//   2xx / 3xx / 429 / other 4xx / 5xx   by HTTP status
+//   timeout                             k6 error 1050 (request) or 1211 (dial)
+//   conn_err                            any other transport failure (status 0)
+// ---------------------------------------------------------------------------
+const statusCounters = {
+  '2xx': new Counter('ai_status_2xx'),
+  '3xx': new Counter('ai_status_3xx'),
+  '429': new Counter('ai_status_429'),
+  '4xx': new Counter('ai_status_4xx'),
+  '5xx': new Counter('ai_status_5xx'),
+  timeout: new Counter('ai_err_timeout'),
+  conn_err: new Counter('ai_err_conn'),
+}
+const STATUS_ORDER = ['2xx', '3xx', '429', '4xx', '5xx', 'timeout', 'conn_err']
+const STATUS_METRIC = {
+  '2xx': 'ai_status_2xx',
+  '3xx': 'ai_status_3xx',
+  '429': 'ai_status_429',
+  '4xx': 'ai_status_4xx',
+  '5xx': 'ai_status_5xx',
+  timeout: 'ai_err_timeout',
+  conn_err: 'ai_err_conn',
+}
+
+export function classifyStatus(status, errorCode) {
+  if (status >= 200 && status < 300) return '2xx'
+  if (status >= 300 && status < 400) return '3xx'
+  if (status === 429) return '429'
+  if (status >= 400 && status < 500) return '4xx'
+  if (status >= 500) return '5xx'
+  return errorCode === 1050 || errorCode === 1211 ? 'timeout' : 'conn_err'
+}
+
+export function recordStatus(response) {
+  statusCounters[classifyStatus(response.status, response.error_code)].add(1)
 }
 
 export function buildTokenText(tokenCount) {
@@ -192,6 +233,12 @@ function metricValue(data, name, key = 'count', fallback = 0) {
   return data.metrics?.[name]?.values?.[key] ?? fallback
 }
 
+// Like metricValue, but undefined when the stat was not collected, so the
+// summary can omit a line instead of printing a misleading 0.
+function optionalValue(data, name, key) {
+  return data.metrics?.[name]?.values?.[key]
+}
+
 function percent(data, name) {
   return metricValue(data, name, 'rate', 0) * 100
 }
@@ -219,6 +266,11 @@ export function renderAiSummary(title, durationSeconds, data, extraLines = []) {
   const vusMax = metricValue(data, 'vus_max', 'value')
   const ttftP95 = metricValue(data, 'ai_time_to_first_token_ms', 'p(95)')
 
+  const httpAvg = optionalValue(data, 'http_req_duration', 'avg')
+  const httpMed = optionalValue(data, 'http_req_duration', 'med')
+  const httpP90 = optionalValue(data, 'http_req_duration', 'p(90)')
+  const httpMax = optionalValue(data, 'http_req_duration', 'max')
+
   const lines = [
     `AI benchmark summary: ${title}`,
     `Duration(s): ${durationSeconds}`,
@@ -237,12 +289,25 @@ export function renderAiSummary(title, durationSeconds, data, extraLines = []) {
     `vus_max: ${vusMax}`,
     `http_req_duration p95(ms): ${httpP95}`,
     `http_req_duration p99(ms): ${httpP99}`,
+    ...[
+      ['avg', httpAvg],
+      ['med', httpMed],
+      ['p90', httpP90],
+      ['max', httpMax],
+    ]
+      .filter(([, value]) => value !== undefined)
+      .map(([label, value]) => `http_req_duration ${label}(ms): ${Number(value).toFixed(3)}`),
     `http_req_failed(%): ${percent(data, 'http_req_failed').toFixed(2)}`,
     `checks pass rate(%): ${percent(data, 'checks').toFixed(2)}`,
   ]
 
   if (ttftP95) {
     lines.push(`ai_time_to_first_token_ms p95: ${ttftP95}`)
+  }
+
+  const statusCounts = STATUS_ORDER.map(name => [name, metricValue(data, STATUS_METRIC[name])])
+  if (statusCounts.some(([, count]) => count > 0)) {
+    lines.push(`http status counts: ${statusCounts.map(([name, count]) => `${name}=${count}`).join(' ')}`)
   }
 
   lines.push(...extraLines)
