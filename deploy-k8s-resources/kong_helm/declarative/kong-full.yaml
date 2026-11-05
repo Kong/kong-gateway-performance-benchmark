@@ -7,6 +7,9 @@ services:
     paths:
     - /bench/static/chat
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -40,6 +43,9 @@ services:
     paths:
     - /bench/token/chat/openai
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -73,6 +79,9 @@ services:
     paths:
     - /bench/token/stream/openai
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -106,6 +115,9 @@ services:
     paths:
     - /bench/token/stream/gemini/models/mock-gemini-2.5-flash:streamGenerateContent
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -139,6 +151,9 @@ services:
     paths:
     - /bench/token/embeddings/openai
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -171,6 +186,9 @@ services:
     paths:
     - /bench/routing/roundrobin-2
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -217,6 +235,9 @@ services:
     paths:
     - /bench/routing/roundrobin-10
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -359,6 +380,9 @@ services:
     paths:
     - /bench/routing/ewma
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -406,6 +430,9 @@ services:
     paths:
     - /bench/routing/failover
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:
@@ -459,6 +486,9 @@ services:
     paths:
     - /bench/logging/chat/openai
     strip_path: false
+    protocols:
+    - http
+    - https
     plugins:
     - name: ai-proxy-advanced
       config:

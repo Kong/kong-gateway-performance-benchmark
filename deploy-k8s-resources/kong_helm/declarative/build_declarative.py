@@ -71,6 +71,9 @@ def main():
                         "name": meta["name"],
                         "paths": [path],
                         "strip_path": strip_path,
+                        # A route without `protocols` was loaded as https-only by this Kong image, so plain
+                        # HTTP got 426; the HTTP-entry scenarios (TLS cost split) need both.
+                        "protocols": ["http", "https"],
                         "plugins": route_plugins,
                     }],
                 })
