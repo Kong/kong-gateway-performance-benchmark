@@ -4,7 +4,8 @@ name: EKS AI Gateway Benchmark
 # (including c5.metal nodes) and tears it down at the end of the run.
 #
 # Two modes (input `run_mode`):
-#   release (default) — full release benchmark: run_release_baseline*.sh matrix x repeats,
+#   release (default) — release benchmark: run_release_baseline*.sh over the matrix in
+#                       release_matrix.yaml (tier1 = per-build subset, tier2 = everything) x repeats,
 #                       compare against a previous run's artifact, generate PDF report.
 #   adhoc             — the original behaviour: run only the scenarios listed in `scenarios`.
 on:
@@ -42,8 +43,15 @@ on:
         description: "[release] Version label used for the results dir / report. Blank = ai-<kong_version>."
         type: string
         default: ""
+      tier:
+        description: "[release] tier1 = cheap per-build subset (gateway/direct overhead pairs); tier2 = every enabled scenario (per release). See release_matrix.yaml."
+        type: choice
+        options:
+          - tier2
+          - tier1
+        default: tier2
       repeats:
-        description: "[release] Repeats per scenario. 6 does NOT fit in the 6h hosted-runner limit (see runtime check)."
+        description: "[release] Repeats per scenario. 6 repeats of tier2 do NOT fit in the 6h hosted-runner limit (see runtime check)."
         type: string
         default: "3"
       duration:
@@ -105,6 +113,10 @@ jobs:
       TF_IN_AUTOMATION: "true"
 
     steps:
+      # Checkout comes first because the run-time estimate is computed by the matrix planner in the repo.
+      - name: Checkout
+        uses: actions/checkout@v4
+
       # Validate release-mode inputs BEFORE spending money on a cluster. Inputs are
       # passed through env vars (never interpolated into the script) and strictly checked.
       - name: Validate inputs
@@ -116,26 +128,39 @@ jobs:
           BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
           RELEASE_LABEL: ${{ inputs.release_label }}
           IGNORE_EST: ${{ inputs.ignore_runtime_estimate }}
+          TIER: ${{ inputs.tier }}
         run: |
           set -euo pipefail
           [[ "$REPEATS" =~ ^[1-9][0-9]*$ ]] || { echo "::error::repeats must be a positive integer"; exit 1; }
           [[ "$DURATION" =~ ^[1-9][0-9]*m$ ]] || { echo "::error::duration must be whole minutes like 3m"; exit 1; }
           [[ -z "$BASELINE_RUN_ID" || "$BASELINE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::baseline_run_id must be numeric"; exit 1; }
           [[ -z "$RELEASE_LABEL" || "$RELEASE_LABEL" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::release_label may only contain [A-Za-z0-9._-]"; exit 1; }
+          [[ "$TIER" =~ ^tier[12]$ ]] || { echo "::error::tier must be tier1 or tier2"; exit 1; }
 
-          scenarios=16; [ "$MLFLOW" = "true" ] && scenarios=22
-          dur=${DURATION%m}
-          # ~1 min of per-run overhead (testrun cleanup, pod start, log collection) + ~40 min cluster create/deploy/destroy
-          est=$(( scenarios * REPEATS * (dur + 1) + 40 ))
-          echo "Estimated runtime: ${est} min (${scenarios} scenarios x ${REPEATS} repeats x (${dur}m + 1m) + 40m); job limit 360 min"
+          # The scenario count comes from the matrix planner (release_matrix.yaml), not from a number
+          # hard-coded here, so the estimate cannot drift away from what the runner will actually execute.
+          # Use the system PyYAML when there is one; otherwise a throw-away venv (system pip may refuse
+          # to install: PEP 668 "externally-managed-environment").
+          PY=python3
+          if ! python3 -c 'import yaml' 2>/dev/null; then
+            python3 -m venv "$RUNNER_TEMP/planner-venv"
+            "$RUNNER_TEMP/planner-venv/bin/pip" install --quiet pyyaml
+            PY="$RUNNER_TEMP/planner-venv/bin/python"
+          fi
+          summary=$("$PY" deploy-k8s-resources/k6_tests/release_matrix.py summary \
+            --tier "$TIER" --repeats "$REPEATS" --include-mlflow50 "$MLFLOW" --duration "$DURATION")
+          run_minutes=$(sed -n 's/.*est_minutes=\([0-9][0-9]*\).*/\1/p' <<< "$summary")
+          [[ "$run_minutes" =~ ^[0-9]+$ ]] || { echo "::error::could not read the estimate from: $summary"; exit 1; }
+          # per-run overhead (~1 min) is already in est_minutes; add ~40 min for cluster create/deploy/destroy
+          est=$(( run_minutes + 40 ))
+          echo "Plan: ${summary}"
+          echo "Estimated runtime: ${est} min (${run_minutes} min of runs + 40 min infrastructure); job limit 360 min"
           echo "### Runtime estimate: ${est} min (limit 360)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Plan: \`${summary}\`" >> "$GITHUB_STEP_SUMMARY"
           if [ "$est" -gt 345 ] && [ "$IGNORE_EST" != "true" ]; then
-            echo "::error::Estimated ${est} min exceeds the 360 min hosted-runner limit. Lower repeats/duration, disable the mlflow50 track, or set ignore_runtime_estimate."
+            echo "::error::Estimated ${est} min exceeds the 360 min hosted-runner limit. Use tier1, lower repeats/duration, disable the mlflow50 track, or set ignore_runtime_estimate."
             exit 1
           fi
-
-      - name: Checkout
-        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -168,7 +193,11 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0
-          python3 -m pip install --quiet pyyaml matplotlib numpy weasyprint
+          # A venv, because system pip may refuse to install (PEP 668). Putting it on PATH makes every later
+          # step's `python3` (planner, aggregate, compare, report) use it.
+          python3 -m venv "$RUNNER_TEMP/report-venv"
+          "$RUNNER_TEMP/report-venv/bin/pip" install --quiet pyyaml matplotlib numpy weasyprint
+          echo "$RUNNER_TEMP/report-venv/bin" >> "$GITHUB_PATH"
 
       # ---------- Phase 1: provision EKS cluster ----------
       - name: Terraform apply — EKS cluster
@@ -215,7 +244,11 @@ jobs:
         run: |
           for f in ai-benchmark-suite.yaml ai-benchmark-policy-suite.yaml \
                    ai-routing-benchmark.yaml ai-logging-benchmark.yaml; do
-            [ -f "$f" ] && kubectl apply -f "$f" || echo "skip missing $f"
+            if [ ! -f "$f" ]; then
+              echo "::warning::$f is not in deploy-k8s-resources/kong_helm - skipped"
+            elif ! kubectl apply -f "$f"; then
+              echo "::warning::kubectl apply failed for $f - continuing (routes are also loaded from the kong-declarative ConfigMap)"
+            fi
           done
 
       # ---------- Phase 4a (adhoc): run the listed scenarios ----------
@@ -272,10 +305,11 @@ jobs:
           DURATION: ${{ inputs.duration }}
           INCLUDE_MLFLOW50_TRACK: ${{ inputs.include_mlflow50_track }}
           GATES_PROFILE: ${{ inputs.gates_profile }}
+          TIER: ${{ inputs.tier }}
         run: |
           set -uo pipefail
           VERSION="${RELEASE_LABEL:-ai-${KONG_VERSION_TAG#ai-}}"
-          export VERSION REPEATS DURATION INCLUDE_MLFLOW50_TRACK
+          export VERSION REPEATS DURATION INCLUDE_MLFLOW50_TRACK TIER
           echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p results/releases
           if [ "$GATES_PROFILE" = "non_dedicated" ]; then
