@@ -237,6 +237,10 @@ class RunnerConfirm(unittest.TestCase):
         self.assertEqual(calls, {"token-chat-openai": 3, "direct-token-chat-openai": 3})   # routing-ewma not run
         self.assertIn("scenarios=2", out)
 
+    def test_expand_groups_false_runs_exactly_the_listed_keys(self):
+        out, calls, main, confirm = self.run_release("only3", "normal", ONLY_KEYS="token-chat-openai", EXPAND_GROUPS="false")
+        self.assertEqual(calls, {"token-chat-openai": 3})                        # no direct control
+
     def test_only_keys_with_a_singleton_runs_only_that_one(self):
         out, calls, main, confirm = self.run_release("only2", "normal", ONLY_KEYS="routing-ewma")
         self.assertEqual(calls, {"routing-ewma": 3})

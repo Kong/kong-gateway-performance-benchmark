@@ -27,7 +27,8 @@
 #                           (cluster smoke run for new scenarios), e.g.
 #                             TIER=tier1 INCLUDE_PENDING=true REPEATS=1 ./run_release_baseline.sh
 #   ONLY_KEYS=a,b           run only these result keys (e.g. token-chat-openai__mlflow50) plus the entries
-#                           that share a group with them, i.e. their direct controls.
+#                           that share a group with them, i.e. their direct controls
+#                           (EXPAND_GROUPS=false: only the listed keys, e.g. when only the gateway's CPU matters).
 #   DRY_RUN=true            print the plan and the time estimate, run nothing
 #                           (no cluster access, no output directory).
 #   CONFIRM_RERUN=true      (default) when the comparison with the baseline flags REGRESSION,
@@ -48,6 +49,7 @@ DURATION="${DURATION:-3m}"
 INCLUDE_MLFLOW50_TRACK="${INCLUDE_MLFLOW50_TRACK:-true}"
 INCLUDE_PENDING="${INCLUDE_PENDING:-false}"
 ONLY_KEYS="${ONLY_KEYS:-}"
+EXPAND_GROUPS="${EXPAND_GROUPS:-true}"
 TIER="${TIER:-tier2}"
 ORDER="${ORDER:-interleaved}"
 SEED="${SEED:-1}"
@@ -91,7 +93,7 @@ fi
 PLAN_ARGS=(--matrix "$MATRIX_FILE" --tier "$TIER" --repeats "$REPEATS"
            --include-mlflow50 "$INCLUDE_MLFLOW50_TRACK" --include-pending "$INCLUDE_PENDING"
            --order "$ORDER" --seed "$SEED")
-[[ -n "$ONLY_KEYS" ]] && PLAN_ARGS+=(--only-keys "$ONLY_KEYS")
+[[ -n "$ONLY_KEYS" ]] && PLAN_ARGS+=(--only-keys "$ONLY_KEYS" --expand-groups "$EXPAND_GROUPS")
 if ! PLAN_TEXT=$(python3 release_matrix.py plan "${PLAN_ARGS[@]}"); then
   echo "ERROR: could not build the run plan from $MATRIX_FILE" >&2
   exit 2
