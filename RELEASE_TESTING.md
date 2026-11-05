@@ -155,6 +155,30 @@ plain HTTP, so the overhead includes the TLS cost of the client hop until the HT
 When an `env.json` sits in both results directories it is compared: drift in instance types, k6 version, config hashes
 or in whether each node shares Kong's availability zone is reported, but does not change the verdict.
 
+## Harness calibration (before reading any capacity number)
+A gateway breakpoint ("max sustainable RPS") only means something if the harness can push more than the gateway can
+take. The fake provider is a single-threaded Node process on a shared node and k6 parses responses, so either may run
+out first. `harness_calibration.py` finds that ceiling with the gateway out of the way:
+
+```bash
+cd deploy-k8s-resources/k6_tests
+python3 harness_calibration.py                                   # steps 200 ... 8000 rps, 30 s each
+python3 harness_calibration.py --steps 500,2000,5000 --step-duration 60s --no-stop
+```
+- Each step is a `direct-calibration` TestRun (k6 → fake provider, zero delay, status-only checks, bodies discarded)
+  at a higher rate. A step **passes** when k6 achieved ≥ 97% of the target (completed iterations ÷ step duration;
+  k6's own `http_reqs/s` divides by the wall clock including start-up and would fail a healthy harness), dropped
+  ≤ 1%, errored ≤ 1% **and p95 stayed ≤ 10 ms**: the upstream answers at once, so a larger p95 means the harness is
+  queueing, and a gateway measured through it would be charged for that.
+- At the failing step it names who ran out first by comparing how busy each side is relative to its capacity (the
+  fake provider's CPU from its cgroup vs ~1 core, k6's CPU from `kubectl top` vs its 60-core limit): `upstream`,
+  `load generator`, or `undetermined` when both are below half.
+- Output in `results/calibration/<timestamp>/`: `calibration.md`, `calibration.json`, per-step logs. Treat gateway
+  capacity numbers as valid only below ~80% of `harness_ceiling_rps`.
+- Locally (10 cores, k6 + the Node fake provider, cluster side stubbed) it held 8000 rps; at 12000 rps p95 went from
+  ~3 ms to ~30 ms with the fake provider at 0.8 of a core and k6 at 1 of 60, so it reported `upstream`. That is an
+  illustration of the method, not a cluster number: run it on the cluster before sizing anything.
+
 ## Diagnosing streaming TTFT
 k6's TTFT is time-to-first-byte; it cannot tell whether the gateway delays the first bytes, holds back the first few
 chunks and releases them in a burst, or slows everything. `diagnose_stream_ttft.py` sends real streaming requests to

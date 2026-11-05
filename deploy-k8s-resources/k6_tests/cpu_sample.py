@@ -22,7 +22,8 @@ k6 start-up, which is roughly constant from release to release; compare_release.
 RELATIVE change, which cancels that constant. It is not a pure per-request cost.
 
 Usage:
-  cpu_sample.py read   [--kubectl kubectl]            print the cumulative CPU seconds
+  cpu_sample.py read   [--kubectl kubectl]            print the cumulative CPU seconds of the Kong proxy
+                       [--namespace N --target deploy/X --container C]   ... or of another container
   cpu_sample.py record --before S --after S --log F   append the "kong cpu:" line to the per-run log
 """
 import argparse
@@ -38,6 +39,15 @@ SNIPPET = (
     "|| cat /sys/fs/cgroup/cpu,cpuacct/cpuacct.usage); fi"
 )
 KUBECTL_ARGS = ["exec", "-n", "kong", "deploy/kong-kong", "-c", "proxy", "--", "sh", "-c", SNIPPET]
+
+
+def kubectl_args(namespace="kong", target="deploy/kong-kong", container="proxy"):
+    """The kubectl exec command that prints the CPU counter of a container (Kong's proxy by default;
+    harness_calibration.py reads the fake provider's). An empty container means the pod's only one."""
+    args = ["exec", "-n", namespace, target]
+    if container:
+        args += ["-c", container]
+    return args + ["--", "sh", "-c", SNIPPET]
 ITERATIONS_RX = re.compile(r"^iterations total:\s*(\d+)", re.M)
 
 
@@ -54,9 +64,10 @@ def parse_cpu_sample(text):
     return None
 
 
-def read_seconds(kubectl="kubectl"):
+def read_seconds(kubectl="kubectl", namespace="kong", target="deploy/kong-kong", container="proxy"):
     try:
-        r = subprocess.run([kubectl, *KUBECTL_ARGS], capture_output=True, text=True, timeout=60)
+        r = subprocess.run([kubectl, *kubectl_args(namespace, target, container)],
+                           capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return parse_cpu_sample(r.stdout) if r.returncode == 0 else None
@@ -84,6 +95,9 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("read")
     r.add_argument("--kubectl", default="kubectl")
+    r.add_argument("--namespace", default="kong")
+    r.add_argument("--target", default="deploy/kong-kong", help="what to exec into, e.g. deploy/fake-provider")
+    r.add_argument("--container", default="proxy", help="container name; empty for the pod's only container")
     rec = sub.add_parser("record")
     rec.add_argument("--before", type=float, required=True)
     rec.add_argument("--after", type=float, required=True)
@@ -91,7 +105,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     if args.cmd == "read":
-        seconds = read_seconds(args.kubectl)
+        seconds = read_seconds(args.kubectl, args.namespace, args.target, args.container)
         if seconds is None:
             return 1
         print(f"{seconds:.6f}")

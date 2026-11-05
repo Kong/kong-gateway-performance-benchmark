@@ -41,6 +41,8 @@ Scenarios:
   direct-stream-gemini Direct fake_provider Gemini stream (gateway bypass)
   token-chat-openai-churn / token-chat-openai-http-churn
                        New TCP(+TLS) connection per request (k6 noConnectionReuse)
+  direct-calibration   Harness calibration: direct fake_provider chat, zero delay, status-only checks, driven by
+                       harness_calibration.py at increasing rates (load = RPS)
   stream-openai-disconnect
                        Client hangs up mid-stream (short timeout, K6_AI_DISCONNECT_AFTER, default 300ms);
                        pair with the fake provider /__stats to see whether the gateway cancels upstream
@@ -383,6 +385,21 @@ case "$SCENARIO" in
     K6_AI_PRE_ALLOCATED_VUS=50
     K6_AI_MAX_VUS=200
     K6_AI_STREAM_VUS=25
+    LOAD_KIND="rps"
+    ;;
+  direct-calibration)
+    # How much can the load generator + the upstream sustain with the gateway out of the way?
+    # See k6_ai_calibration.js and harness_calibration.py.
+    SCRIPT_FILE="k6_ai_calibration.js"
+    K6_AI_CHAT_URL="http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions"
+    K6_AI_RATE=${LOAD:-200}
+    K6_AI_DURATION=${DURATION:-30s}
+    # k6 refuses to start when preAllocatedVUs > maxVUs, so the maximum follows the pre-allocation
+    K6_AI_PRE_ALLOCATED_VUS=$(( K6_AI_RATE / 4 + 50 ))
+    K6_AI_MAX_VUS=$(( K6_AI_PRE_ALLOCATED_VUS * 2 ))
+    (( K6_AI_MAX_VUS < 2000 )) && K6_AI_MAX_VUS=2000
+    K6_AI_STREAM_VUS=25
+    K6_AI_TIMEOUT="${K6_AI_TIMEOUT:-10s}"
     LOAD_KIND="rps"
     ;;
   stream-openai-disconnect)
