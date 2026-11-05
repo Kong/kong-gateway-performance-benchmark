@@ -156,6 +156,15 @@ plain HTTP, so the overhead includes the TLS cost of the client hop until the HT
 When an `env.json` sits in both results directories it is compared: drift in instance types, k6 version, config hashes
 or in whether each node shares Kong's availability zone is reported, but does not change the verdict.
 
+## Comparing two configurations (A/B) and the noise floor (A/A)
+Running config A for an hour and then config B mixes the effect with everything that drifts between the blocks. Run
+them in interleaved rounds instead (round 1: A then B, round 2: B then A, ...; one `run_release_baseline.sh`
+invocation per config and round with `REPEATS=1`, directories named `<prefix>-<config>-r<N>`) and compare per round:
+`paired_ab.py --prefix <prefix> --a <config> --b <config> --scenarios ... --metric cpu --first-odd a` prints the mean
+paired difference, its bootstrap 95% CI, in how many rounds B > A (exact sign test; with 6 rounds the smallest
+possible p is 0.031) and the mean difference when A vs B ran first, which exposes an order effect. Use the same tool
+with the same config twice (A/A) to measure the noise floor the gates' thresholds have to sit above.
+
 ## Harness calibration (before reading any capacity number)
 A gateway breakpoint ("max sustainable RPS") only means something if the harness can push more than the gateway can
 take. The fake provider is a single-threaded Node process on a shared node and k6 parses responses, so either may run
