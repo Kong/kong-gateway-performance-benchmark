@@ -175,6 +175,15 @@ class RunnerConfirm(unittest.TestCase):
         self.assertIsNone(confirm)
         self.assertEqual(calls["token-chat-openai"], 3)
 
+    def test_only_keys_runs_just_those_scenarios_and_their_direct_controls(self):
+        out, calls, main, confirm = self.run_release("only", "normal", ONLY_KEYS="token-chat-openai")
+        self.assertEqual(calls, {"token-chat-openai": 3, "direct-token-chat-openai": 3})   # routing-ewma not run
+        self.assertIn("scenarios=2", out)
+
+    def test_only_keys_with_a_singleton_runs_only_that_one(self):
+        out, calls, main, confirm = self.run_release("only2", "normal", ONLY_KEYS="routing-ewma")
+        self.assertEqual(calls, {"routing-ewma": 3})
+
     def test_a_stale_confirm_directory_from_an_earlier_attempt_is_not_mixed_in(self):
         self.baseline()
         self.run_release("cur", "regress_always")
