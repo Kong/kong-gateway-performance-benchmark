@@ -50,6 +50,10 @@ on:
           - tier2
           - tier1
         default: tier2
+      confirm_rerun:
+        description: "[release] Re-run the scenarios flagged REGRESSION/UNSTABLE/over the overhead budget once and only count findings that reproduce (the runner skips it when more than 8 are flagged)"
+        type: boolean
+        default: true
       repeats:
         description: "[release] Repeats per scenario. 6 repeats of tier2 do NOT fit in the 6h hosted-runner limit (see runtime check)."
         type: string
@@ -129,6 +133,7 @@ jobs:
           RELEASE_LABEL: ${{ inputs.release_label }}
           IGNORE_EST: ${{ inputs.ignore_runtime_estimate }}
           TIER: ${{ inputs.tier }}
+          CONFIRM: ${{ inputs.confirm_rerun }}
         run: |
           set -euo pipefail
           [[ "$REPEATS" =~ ^[1-9][0-9]*$ ]] || { echo "::error::repeats must be a positive integer"; exit 1; }
@@ -153,8 +158,14 @@ jobs:
           [[ "$run_minutes" =~ ^[0-9]+$ ]] || { echo "::error::could not read the estimate from: $summary"; exit 1; }
           # per-run overhead (~1 min) is already in est_minutes; add ~40 min for cluster create/deploy/destroy
           est=$(( run_minutes + 40 ))
+          # The confirmation re-run only happens when something is flagged. Reserve time for the usual case, one
+          # flagged scenario plus its direct control (2 scenarios x repeats x (duration + 1 min)); if more are
+          # flagged the job can still run out of time, so keep an eye on the first-pass report.
+          reserve=0
+          if [ "$CONFIRM" = "true" ]; then reserve=$(( 2 * REPEATS * (${DURATION%m} + 1) )); fi
+          est=$(( est + reserve ))
           echo "Plan: ${summary}"
-          echo "Estimated runtime: ${est} min (${run_minutes} min of runs + 40 min infrastructure); job limit 360 min"
+          echo "Estimated runtime: ${est} min (${run_minutes} min of runs + 40 min infrastructure + ${reserve} min reserved for a confirmation re-run); job limit 360 min"
           echo "### Runtime estimate: ${est} min (limit 360)" >> "$GITHUB_STEP_SUMMARY"
           echo "Plan: \`${summary}\`" >> "$GITHUB_STEP_SUMMARY"
           if [ "$est" -gt 345 ] && [ "$IGNORE_EST" != "true" ]; then
@@ -306,10 +317,11 @@ jobs:
           INCLUDE_MLFLOW50_TRACK: ${{ inputs.include_mlflow50_track }}
           GATES_PROFILE: ${{ inputs.gates_profile }}
           TIER: ${{ inputs.tier }}
+          CONFIRM_RERUN: ${{ inputs.confirm_rerun }}
         run: |
           set -uo pipefail
           VERSION="${RELEASE_LABEL:-ai-${KONG_VERSION_TAG#ai-}}"
-          export VERSION REPEATS DURATION INCLUDE_MLFLOW50_TRACK TIER
+          export VERSION REPEATS DURATION INCLUDE_MLFLOW50_TRACK TIER CONFIRM_RERUN
           echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p results/releases
           if [ "$GATES_PROFILE" = "non_dedicated" ]; then
