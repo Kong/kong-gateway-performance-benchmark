@@ -101,6 +101,10 @@ mkdir -p "$OUTDIR"
 # Keep the executed order next to the results as evidence.
 printf '%s\n' "${PLAN[@]}" > "$OUTDIR/plan.tsv"
 
+# Record the test environment (nodes, zones, Kong image digest, configs, ...) for drift checks.
+# Best effort: it never fails the run.
+python3 collect_env.py --out "$OUTDIR/env.json" --phase start || echo "WARNING: could not record the environment (start)"
+
 # Lines of the k6 summary kept in each per-run log (parsed by aggregate_release.py).
 # p90/p95/p99 and avg/med/max latency, achieved rate, failures, checks, TTFT,
 # iterations + dropped_iterations (the "iterations total" alternative matches
@@ -171,6 +175,8 @@ for line in "${PLAN[@]}"; do
   fi
   run_one "$r" "$scenario" "$fixture" "$load" "$scenario_key"
 done
+
+python3 collect_env.py --out "$OUTDIR/env.json" --phase end || echo "WARNING: could not record the environment (end)"
 
 echo "=== aggregating ==="
 python3 aggregate_release.py --dir "$OUTDIR" --version "$VERSION" --captured-at "$CAPTURED_AT"

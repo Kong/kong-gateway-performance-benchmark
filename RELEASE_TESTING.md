@@ -93,6 +93,10 @@ Produces `results/releases/<version>_<date>/`:
 - `*__run<N>.log` — raw k6 summary per repeat (evidence): latency avg/med/p90/p95/p99/max, rate, errors,
   dropped iterations, status / error counts
 - `plan.tsv` — the order in which the runs were executed
+- `env.json` — the test environment, recorded at the start and end of the run (`collect_env.py`): nodes (role, instance
+  type, zone, kernel, OS), Kong image digest and version, k6 runner version, hashes of the Kong declarative config and
+  of the fake provider (script + env), suite git sha. Collection is best effort and never fails a run; anything it
+  could not read is listed in `collection_errors`, and fields that changed during the run in `changed_during_run`.
 - `metrics.json` (schema 2) — means + CV (sample stdev) per gate metric, plus median/IQR/stdev/min/max,
   `dropped_pct`, `status_totals` and the raw `per_run` values
 - `summary.csv` — flat table for spreadsheets/sign-off
