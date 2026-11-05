@@ -64,7 +64,7 @@ RISE_METRICS = LATENCY_METRICS + [CPU_METRIC]
 MEDIAN_METRICS = {"p95_ms", "p99_ms", "ttft_p95_ms", "throughput_rps"}
 GATE_METRICS = ["p95_ms", "p99_ms", "ttft_p95_ms", "throughput_rps", "error_rate_pct", CPU_METRIC]
 EXTRA_STAT_KEYS = ("median", "iqr", "stdev", "min", "max", "per_run", "dropped_pct", "status_totals",
-                   "upstream_totals")
+                   "upstream_totals", "infra")
 
 # Used only when the SLO config has an overhead_slo section without the value.
 DEFAULT_OVERHEAD_BUDGET_MS = {"p95_ms": 5.0, "p99_ms": 10.0, "ttft_p95_ms": 20.0}

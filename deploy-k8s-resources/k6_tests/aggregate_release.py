@@ -19,6 +19,9 @@ Per scenario, metrics.json holds:
     per repeat, in percent — null when the logs predate that field;
   * status_totals: HTTP status / error counts summed over repeats — null when
     the logs predate that field;
+  * infra: {cpu_seconds_per_1k_req: median across repeats} from the "kong cpu:" line the runner
+    appends to gateway runs (cpu_sample.py); null when the logs have none. compare_release.py gates
+    on it (a sensitive efficiency signal at low load, where latency barely moves);
   * upstream_totals: for client-disconnect scenarios, the fake provider's started /
     completed / aborted counts summed over repeats (the runner appends an
     "upstream stats:" line to the per-run log) and aborted_pct = aborted / started;
@@ -71,6 +74,7 @@ EXTRA_LATENCY_PATTERNS = {
 ITERATIONS_RX = re.compile(r"^iterations total:\s*(\d+)", re.M)
 DROPPED_RX = re.compile(r"^dropped_iterations total:\s*(\d+)", re.M)
 STATUS_RX = re.compile(r"^http status counts:\s*(.+)$", re.M)
+CPU_RX = re.compile(r"^kong cpu: seconds=([\d.]+) iterations=(\d+) seconds_per_1k=([\d.]+)", re.M)
 UPSTREAM_RX = re.compile(
     r"^upstream stats: started=(\d+) completed=(\d+) aborted=(\d+) active=(\d+)", re.M)
 
@@ -104,6 +108,8 @@ def parse_log(path):
     else:
         out["dropped_pct"] = None
     out["status"] = parse_status(text)
+    cpu = CPU_RX.search(text)
+    out["cpu_seconds_per_1k_req"] = float(cpu.group(3)) if cpu else None
     up = UPSTREAM_RX.search(text)
     out["upstream"] = (
         dict(zip(("started", "completed", "aborted", "active"), map(int, up.groups()))) if up else None
@@ -173,7 +179,8 @@ def aggregate_scenario(reps):
     agg["per_run"] = [
         {"run": r.get("run"),
          **{m: r.get(m) for m in STAT_METRICS},
-         "dropped_pct": None if r.get("dropped_pct") is None else round(r["dropped_pct"], 3)}
+         "dropped_pct": None if r.get("dropped_pct") is None else round(r["dropped_pct"], 3),
+         "cpu_seconds_per_1k_req": r.get("cpu_seconds_per_1k_req")}
         for r in ordered
     ]
 
@@ -185,6 +192,9 @@ def aggregate_scenario(reps):
             for name, count in r["status"].items():
                 totals[name] += count
     agg["status_totals"] = dict(totals) if seen else None
+
+    cpu = [r["cpu_seconds_per_1k_req"] for r in reps if r.get("cpu_seconds_per_1k_req") is not None]
+    agg["infra"] = {"cpu_seconds_per_1k_req": round(statistics.median(cpu), 4)} if cpu else None
 
     ups = [r["upstream"] for r in reps if r.get("upstream")]
     if ups:

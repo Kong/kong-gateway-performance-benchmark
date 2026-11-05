@@ -134,11 +134,16 @@ PY
 
 run_one() {
   local r="$1" scenario="$2" fixture="$3" load="$4" scenario_key="$5"
-  local run_driver_log rp ph
+  local run_driver_log rp ph cpu_before cpu_after
   echo "--- $scenario ($fixture) repeat $r/$REPEATS  (load=$load, $DURATION) ---"
   run_driver_log="$OUTDIR/${scenario_key}__run${r}.driver.log"
   if [[ "$scenario" == *-disconnect ]]; then
     fake_provider_stats /reset >/dev/null || echo "    WARNING: could not reset the fake provider stats"
+  fi
+  # Kong CPU before the run (gateway scenarios only; direct-* never touch Kong)
+  cpu_before=""
+  if [[ "$scenario" != direct-* ]]; then
+    cpu_before=$(python3 cpu_sample.py read) || cpu_before=""
   fi
   {
     echo "[driver] deleting previous testruns"
@@ -161,6 +166,15 @@ run_one() {
     grep -E "$RUN_LOG_PATTERN" \
     > "$OUTDIR/${scenario_key}__run${r}.log"
   echo "    saved $OUTDIR/${scenario_key}__run${r}.log (phase=$ph)"
+  if [[ -n "$cpu_before" ]]; then
+    if cpu_after=$(python3 cpu_sample.py read); then
+      python3 cpu_sample.py record --before "$cpu_before" --after "$cpu_after" \
+        --log "$OUTDIR/${scenario_key}__run${r}.log" | sed 's/^/    /' \
+        || echo "    WARNING: Kong CPU not recorded for $scenario_key run $r"
+    else
+      echo "    WARNING: could not read the Kong CPU after the run"
+    fi
+  fi
   if [[ "$scenario" == *-disconnect ]]; then
     record_upstream_stats "$OUTDIR/${scenario_key}__run${r}.log"
   fi

@@ -18,7 +18,11 @@ and (3) prove the comparison harness — so future releases are a turnkey diff.
 2. **Regression gate (relative)** — `release_gates.yaml`. Per scenario, p95/p99/TTFT/throughput/error rate vs the
    baseline, plus the **overhead vs the baseline's overhead, in absolute milliseconds** (p95 +1 ms WARN / +3 ms
    REGRESSION; p99 +2 / +6; TTFT +1 / +3). A percentage gate cannot see a gateway-overhead regression: +4 ms on a
-   614 ms path is 0.6%.
+   614 ms path is 0.6%. When both runs carry it, **Kong CPU seconds per 1k requests** is gated too (+10% WARN /
+   +25% REGRESSION): at low load latency barely moves, but the CPU burned per request is a sensitive efficiency signal.
+   It is the Kong container's cumulative CPU (cgroup, read with `kubectl exec`; `cpu_sample.py`) over the measurement
+   window divided by the iterations k6 completed — idle work and the k6 start-up are inside the window, so only the
+   relative change between releases is meaningful.
 3. **Stability gate** — ≥3 repeats, per-metric CV (sample standard deviation) < 15%. A noisy run is `UNSTABLE` →
    re-run, don't trust/escalate.
 4. **Confirmation (optional)** — `compare_release.py --confirm <second run>`: a REGRESSION/UNSTABLE only counts when
@@ -91,7 +95,8 @@ VERSION=ai-2.0.0-rc.2 ./run_release_baseline.sh
 ```
 Produces `results/releases/<version>_<date>/`:
 - `*__run<N>.log` — raw k6 summary per repeat (evidence): latency avg/med/p90/p95/p99/max, rate, errors,
-  dropped iterations, status / error counts
+  dropped iterations, status / error counts, and for gateway runs the `kong cpu:` line (seconds, iterations,
+  seconds per 1k requests)
 - `plan.tsv` — the order in which the runs were executed
 - `env.json` — the test environment, recorded at the start and end of the run (`collect_env.py`): nodes (role, instance
   type, zone, kernel, OS), Kong image digest and version, k6 runner version, hashes of the Kong declarative config and

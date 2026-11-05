@@ -203,6 +203,41 @@ class UpstreamStats(unittest.TestCase):
         self.assertEqual(a["upstream_totals"]["started"], 10)
 
 
+class CpuPerRequest(unittest.TestCase):
+    def rep(self, per_1k):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "s__run1.log"
+            line = "" if per_1k is None else f"kong cpu: seconds=12.5 iterations=9000 seconds_per_1k={per_1k}\n"
+            p.write_text(new_log() + line)
+            return ag.parse_log(p)
+
+    def test_parse(self):
+        self.assertEqual(self.rep(1.3889)["cpu_seconds_per_1k_req"], 1.3889)
+        self.assertIsNone(self.rep(None)["cpu_seconds_per_1k_req"])
+
+    def test_infra_is_the_median_across_repeats(self):
+        a = ag.aggregate_scenario([self.rep(v) for v in (1.0, 1.1, 5.0)])   # one disturbed repeat
+        self.assertEqual(a["infra"], {"cpu_seconds_per_1k_req": 1.1})
+
+    def test_infra_is_null_without_cpu_lines_and_ignores_repeats_that_lack_one(self):
+        self.assertIsNone(ag.aggregate_scenario([self.rep(None)])["infra"])
+        self.assertEqual(ag.aggregate_scenario([self.rep(None), self.rep(2.0)])["infra"]["cpu_seconds_per_1k_req"], 2.0)
+
+    def test_per_run_keeps_the_raw_value(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "s__run1.log").write_text(new_log() + "kong cpu: seconds=1 iterations=100 seconds_per_1k=10.0\n")
+            (d / "s__run2.log").write_text(new_log())
+            subprocess.run([sys.executable, "-B", str(K6_TESTS / "aggregate_release.py"), "--dir", str(d),
+                            "--version", "v", "--captured-at", "x"], check=True, capture_output=True)
+            runs = json.loads((d / "metrics.json").read_text())["scenarios"]["s"]["per_run"]
+        self.assertEqual([r["cpu_seconds_per_1k_req"] for r in runs], [10.0, None])
+
+    def test_cpu_stays_out_of_cv_pct(self):
+        a = ag.aggregate_scenario([self.rep(v) for v in (1.0, 9.0)])
+        self.assertNotIn("cpu_seconds_per_1k_req", a["cv_pct"])
+
+
 class PerRun(unittest.TestCase):
     def test_per_run_is_ordered_numerically_and_keeps_raw_values(self):
         with tempfile.TemporaryDirectory() as d:

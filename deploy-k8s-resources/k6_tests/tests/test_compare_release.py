@@ -54,6 +54,8 @@ def render(spec, r):
         p99=pick(spec["p99"], r) if "p99" in spec else pick(spec["p95"], r) + 1.0,
         err=pick(spec.get("err", 0.0), r),
         ttft="" if ttft is None else f"ai_time_to_first_token_ms p95: {pick(ttft, r)}\n")
+    if spec.get("cpu") is not None:  # seconds per 1k requests, as cpu_sample.py appends it
+        text += f"kong cpu: seconds=10.000 iterations=9000 seconds_per_1k={pick(spec['cpu'], r)}\n"
     if spec.get("upstream"):  # (started, completed, aborted, active), as the runner appends it
         started, completed, aborted, active = spec["upstream"]
         text += f"upstream stats: started={started} completed={completed} aborted={aborted} active={active}\n"
@@ -344,6 +346,21 @@ class CpuGate(Base):
         self.assertTrue(any(r["metric"] == "cpu_seconds_per_1k_req" for r in v["regressions"]))
         cur_small = self.release("cur2", spec, infra={"token-chat-openai": {"cpu_seconds_per_1k_req": 0.52}})
         _, v, _ = self.run_cmp(cur_small, base)
+        self.assertEqual([r for r in v["regressions"] + v["warnings"] if r["metric"] == "cpu_seconds_per_1k_req"], [])
+
+    def test_cpu_gate_works_through_aggregate_and_compare_from_per_run_logs(self):
+        base = self.release("base", {"token-chat-openai": {"p95": 100.0, "cpu": 0.50}})
+        slow = self.release("slow", {"token-chat-openai": {"p95": 100.0, "cpu": 0.70}})     # +40%
+        same = self.release("same", {"token-chat-openai": {"p95": 100.0, "cpu": 0.51}})     # +2%
+        _, v, _ = self.run_cmp(slow, base)
+        self.assertTrue(any(r["metric"] == "cpu_seconds_per_1k_req" for r in v["regressions"]))
+        _, v, _ = self.run_cmp(same, base)
+        self.assertEqual([r for r in v["regressions"] + v["warnings"] if r["metric"] == "cpu_seconds_per_1k_req"], [])
+
+    def test_an_older_baseline_without_cpu_lines_is_not_gated_on_cpu(self):
+        base = self.release("base", {"token-chat-openai": {"p95": 100.0}})
+        cur = self.release("cur", {"token-chat-openai": {"p95": 100.0, "cpu": 9.9}})
+        _, v, _ = self.run_cmp(cur, base)
         self.assertEqual([r for r in v["regressions"] + v["warnings"] if r["metric"] == "cpu_seconds_per_1k_req"], [])
 
     def test_missing_cpu_data_is_skipped_silently(self):
