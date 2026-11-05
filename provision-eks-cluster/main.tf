@@ -139,6 +139,11 @@ module "vpc" {
   }
 }
 
+locals {
+  # Nodes in a single AZ (see var.pin_nodes_to_single_az); the control plane keeps every subnet.
+  node_subnet_ids = var.pin_nodes_to_single_az ? [module.vpc.private_subnets[var.node_az_index]] : module.vpc.private_subnets
+}
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "19.15.3"
@@ -149,7 +154,8 @@ module "eks" {
   iam_role_arn    = local.reuse_cluster_iam_role ? var.cluster_iam_role_arn : null
 
   vpc_id                         = module.vpc.vpc_id
-  subnet_ids                     = module.vpc.private_subnets
+  subnet_ids                     = local.node_subnet_ids
+  control_plane_subnet_ids       = module.vpc.private_subnets
   cluster_endpoint_public_access = true
   enable_irsa                    = var.enable_irsa
 

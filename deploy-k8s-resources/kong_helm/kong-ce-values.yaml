@@ -19,6 +19,15 @@ admin:
 ingressController:
   enabled: true
 
+# CPU / memory requests for the Kong proxy, no limits. Requests make the scheduler account for Kong and keep
+# the QoS class above BestEffort; leaving the limit off avoids CFS throttling, which shows up as latency jitter
+# with many nginx workers. Sized for a c5.4xlarge (16 vCPU / 32 GiB) shared with the DaemonSets.
+# Provisional until a calibration run shows the real usage.
+resources:
+  requests:
+    cpu: "12"
+    memory: 8Gi
+
 nodeSelector:
   benchmark.konghq.com/node-role: kong
 

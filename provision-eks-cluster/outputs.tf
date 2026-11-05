@@ -22,3 +22,8 @@ output "vpc_id" {
   description = "VPC ID for the benchmark cluster"
   value       = module.vpc.vpc_id
 }
+
+output "node_availability_zone" {
+  description = "AZ all node groups run in, or \"all\" when pin_nodes_to_single_az is false"
+  value       = var.pin_nodes_to_single_az ? module.vpc.azs[var.node_az_index] : "all"
+}

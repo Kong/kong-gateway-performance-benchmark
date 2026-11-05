@@ -42,6 +42,20 @@ error-rate +1.0pt. Latency regressions below a 20 ms absolute floor are ignored 
 The overhead budgets and tolerances are provisional until an A/A calibration (the same release twice on the same
 topology) measures the real noise floor; so far the paired p95 overhead has a run-to-run sd of 0.07–0.33 ms.
 
+## Test cluster topology
+- **One availability zone.** All managed node groups run in a single AZ (`pin_nodes_to_single_az`, default true;
+  `node_az_index` picks which, 0 = the NAT gateway's AZ). The subnets span three AZs and each node group's node used
+  to land in a random one, so a cluster could have the load generator, Kong and the upstream in different AZs:
+  ~0.5–1 ms of cross-AZ round trip, the same size as the ~1 ms gateway overhead being measured, and different from
+  cluster to cluster. The EKS control plane keeps all subnets (it needs at least two AZs). `terraform output
+  node_availability_zone` shows the zone.
+- **Kong sizing.** CPU/memory requests of 12 CPU / 8 GiB and no limits (limits would add CFS throttling jitter), and
+  `kong_worker_processes` defaults to 14 = vCPU − 2 on the 16-vCPU node, which also runs the kubelet and DaemonSets.
+  All provisional until a calibration run shows the real usage.
+- **Baselines.** Results recorded before this change come from clusters with a random AZ layout and 16 workers. Compare
+  a release against a baseline from the same topology; `env.json` records the zones and the report warns when the
+  layout differs from the baseline's.
+
 ## Standard run profile
 Fixed so every release is apples-to-apples. Defined in `release_matrix.yaml` (read by `run_release_baseline.sh`):
 

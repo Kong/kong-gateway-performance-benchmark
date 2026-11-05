@@ -40,6 +40,29 @@ variable "enable_ebs_csi_addon" {
   default     = true
 }
 
+variable "pin_nodes_to_single_az" {
+  description = <<-EOT
+    Put every managed node group in ONE availability zone. Subnets are spread over three AZs and each
+    node group's node would otherwise land in a random one, so a new cluster can have the load generator,
+    Kong and the upstream in different AZs: ~0.5-1 ms of cross-AZ round trip, the same size as the ~1 ms
+    gateway overhead the benchmark measures, and different from cluster to cluster. The control plane keeps
+    all subnets (EKS needs at least two AZs there).
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "node_az_index" {
+  description = "Which of the three private subnets / AZs the nodes use when pin_nodes_to_single_az is true. 0 is the AZ of the (single) NAT gateway."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.node_az_index >= 0 && var.node_az_index <= 2
+    error_message = "node_az_index must be 0, 1 or 2 (there are three private subnets)."
+  }
+}
+
 variable "cluster_version" {
   description = "EKS Kubernetes version"
   type        = string

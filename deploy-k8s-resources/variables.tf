@@ -34,7 +34,7 @@ variable "kong_effective_semver" {
 
 variable "kong_worker_processes" {
 
-  description = "Number of nginx worker processes, set this to be the same as the number of CPU cores allocated to Kong"
+  description = "Number of nginx worker processes. The Kong node has 16 vCPU (c5.4xlarge) and also runs the kubelet, kube-proxy and the DaemonSets, so leave two cores for them (vCPU - 2) instead of one worker per core."
   type        = number
-  default     = 16
+  default     = 14
 }
