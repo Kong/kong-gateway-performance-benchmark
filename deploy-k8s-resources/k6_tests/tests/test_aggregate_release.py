@@ -238,6 +238,24 @@ class CpuPerRequest(unittest.TestCase):
         self.assertNotIn("cpu_seconds_per_1k_req", a["cv_pct"])
 
 
+class EmptyLogs(unittest.TestCase):
+    def test_an_empty_summary_is_not_a_repeat_and_is_reported(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "s__run1.log").write_text(new_log(p95=100.0))
+            (d / "s__run2.log").write_text("")                  # kubectl lost its credentials for this one
+            (d / "s__run3.log").write_text("\n  \n")
+            (d / "t__run1.log").write_text("")                  # a scenario with nothing usable at all
+            r = subprocess.run([sys.executable, "-B", str(K6_TESTS / "aggregate_release.py"), "--dir", str(d),
+                                "--version", "v", "--captured-at", "x"], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            m = json.loads((d / "metrics.json").read_text())["scenarios"]
+        self.assertEqual(m["s"]["repeats"], 1)
+        self.assertNotIn("t", m)
+        self.assertIn("ignoring s__run2.log: empty summary", r.stderr)
+        self.assertIn("ignoring t__run1.log", r.stderr)
+
+
 class PerRun(unittest.TestCase):
     def test_per_run_is_ordered_numerically_and_keeps_raw_values(self):
         with tempfile.TemporaryDirectory() as d:

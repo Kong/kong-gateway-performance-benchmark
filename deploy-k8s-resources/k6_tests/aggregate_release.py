@@ -46,6 +46,7 @@ import csv
 import json
 import re
 import statistics
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -216,6 +217,10 @@ def collect_scenarios(d):
     runs = defaultdict(list)  # scenario -> [per-repeat dicts]
     for log in sorted(Path(d).glob("*__run*.log")):
         if log.name.endswith(".driver.log"):
+            continue
+        if not log.read_text(errors="ignore").strip():
+            # a run whose summary could not be read (e.g. kubectl lost its credentials): not a repeat
+            print(f"aggregate_release.py: ignoring {log.name}: empty summary", file=sys.stderr)
             continue
         scenario = log.name.split("__run")[0]
         rep = parse_log(log)

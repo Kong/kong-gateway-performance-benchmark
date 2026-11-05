@@ -52,6 +52,7 @@ TIER="${TIER:-tier2}"
 ORDER="${ORDER:-interleaved}"
 SEED="${SEED:-1}"
 DRY_RUN="${DRY_RUN:-false}"
+INTERRUPTED=0
 CONFIRM_RERUN="${CONFIRM_RERUN:-true}"
 CONFIRM_MAX_SCENARIOS="${CONFIRM_MAX_SCENARIOS:-8}"
 # Settling pauses (seconds): after deleting the previous TestRun, and before reading the fake
@@ -141,9 +142,16 @@ PY
 ) && echo "$line" >> "$1" && echo "    $line" || echo "    WARNING: could not read the fake provider stats"
 }
 
+# A long run outlives short-lived credentials (an SSO session expired during an 8 h benchmark and the
+# runner crashed on an unset variable without aggregating anything). Check before every run, so an
+# unreachable cluster stops the run with a clear message and what was collected is still reported.
+cluster_reachable() {
+  kubectl get ns k6 -o name >/dev/null 2>&1
+}
+
 run_one() {
   local r="$1" scenario="$2" fixture="$3" load="$4" scenario_key="$5"
-  local run_driver_log rp ph cpu_before cpu_after
+  local run_driver_log rp="" ph="" cpu_before cpu_after
   echo "--- $scenario ($fixture) repeat $r/$REPEATS  (load=$load, $DURATION) ---"
   run_driver_log="$OUTDIR/${scenario_key}__run${r}.driver.log"
   if [[ "$scenario" == *-disconnect ]]; then
@@ -165,7 +173,12 @@ run_one() {
   rp=""
   for i in $(seq 1 80); do
     rp=$(kubectl get pods -n k6 --no-headers 2>/dev/null | grep -E "k6-ai-benchmark-1" | head -1 | awk '{print $1}')
-    [ -z "$rp" ] && { sleep 5; continue; }
+    if [ -z "$rp" ]; then
+      # no pod yet: normal at the start of a run, but not worth 400 s of polling when the cluster is gone
+      cluster_reachable || { echo "    WARNING: the cluster became unreachable while waiting for the runner pod" >&2; break; }
+      sleep 5
+      continue
+    fi
     ph=$(kubectl get pod -n k6 "$rp" -o jsonpath='{.status.phase}' 2>/dev/null)
     { [ "$ph" = "Succeeded" ] || [ "$ph" = "Failed" ]; } && break
     sleep 6
@@ -174,7 +187,8 @@ run_one() {
   kubectl logs -n k6 "$rp" 2>/dev/null | \
     grep -E "$RUN_LOG_PATTERN" \
     > "$OUTDIR/${scenario_key}__run${r}.log"
-  echo "    saved $OUTDIR/${scenario_key}__run${r}.log (phase=$ph)"
+  echo "    saved $OUTDIR/${scenario_key}__run${r}.log (phase=${ph:-unknown})"
+  grep -q . "$OUTDIR/${scenario_key}__run${r}.log" || echo "    WARNING: the summary of $scenario_key run $r is empty (kubectl logs failed?); it is ignored when aggregating"
   if [[ -n "$cpu_before" ]]; then
     if cpu_after=$(python3 cpu_sample.py read); then
       python3 cpu_sample.py record --before "$cpu_before" --after "$cpu_after" \
@@ -200,13 +214,21 @@ execute_runs() {
   # Best effort: it never fails the run.
   python3 collect_env.py --out "$OUTDIR/env.json" --phase start || echo "WARNING: could not record the environment (start)"
 
+  local executed=0
   for line in "${PLAN[@]}"; do
     IFS=$'\t' read -r r scenario fixture load scenario_key status <<< "$line"
+    if ! cluster_reachable; then
+      echo "ERROR: kubectl cannot reach the cluster (expired credentials?). Stopping after $executed of ${#PLAN[@]} runs;" \
+           "what was collected is aggregated and reported below, the run is incomplete." >&2
+      INTERRUPTED=1
+      break
+    fi
     if [[ "$r" != "$current_round" ]]; then
       current_round="$r"
       echo "=== Round $r/$REPEATS ==="
     fi
     run_one "$r" "$scenario" "$fixture" "$load" "$scenario_key"
+    executed=$((executed + 1))
   done
 
   python3 collect_env.py --out "$OUTDIR/env.json" --phase end || echo "WARNING: could not record the environment (end)"
@@ -267,7 +289,7 @@ if [ -f "$BASELINE_PTR" ]; then
   python3 compare_release.py --current "$OUTDIR" --baseline "$BASE_DIR" \
     --gates "$GATES_FILE" --slo-config "$SLO_CONFIG_FILE" --out "$OUTDIR/report.md" --json "$OUTDIR/verdict.json"
   echo "verdict exit: $?"
-  if [[ "$CONFIRM_RERUN" == "true" ]]; then
+  if [[ "$CONFIRM_RERUN" == "true" && "$INTERRUPTED" == "0" ]]; then
     confirm_flagged
   fi
 else
@@ -278,3 +300,7 @@ else
   echo "baseline.json -> $OUTDIR"
 fi
 echo "BASELINE_CAPTURE_DONE: $OUTDIR"
+if [[ "$INTERRUPTED" == "1" ]]; then
+  echo "RUN INCOMPLETE: the cluster became unreachable part-way through (exit 3)" >&2
+  exit 3
+fi

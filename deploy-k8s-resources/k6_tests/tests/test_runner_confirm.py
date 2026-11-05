@@ -31,6 +31,9 @@ path = f"{T}/calls.json"
 calls = json.load(open(path)) if os.path.exists(path) else {}
 calls[scenario] = calls.get(scenario, 0) + 1
 json.dump(calls, open(path, "w"))
+down_after = int(os.environ.get("STUB_DOWN_AFTER", "0"))
+if down_after and sum(calls.values()) >= down_after:
+    open(f"{T}/cluster.down", "w").write("x")       # the cluster becomes unreachable once this run is over
 n = calls[scenario]
 base = {"token-chat-openai": 614.5, "direct-token-chat-openai": 613.4, "routing-ewma": 614.8}[scenario]
 kind, _, when = mode.partition("_")        # normal | regress_once | regress_always | breach_once | breach_always
@@ -56,7 +59,9 @@ PY
 '''
 
 KUBECTL_STUB = r'''#!/bin/bash
+[ -e "$STUB_DIR/cluster.down" ] && exit 1      # credentials expired: every call fails
 case "$*" in
+  "get ns k6 -o name") echo namespace/k6;;
   "get pods -n k6 --no-headers") echo "k6-ai-benchmark-1-abcde 1/1 Running 0 1m";;
   get\ pod\ -n\ k6*jsonpath*) echo -n "Succeeded";;
   logs\ -n\ k6*) cat "$STUB_DIR/k6.out";;
@@ -92,6 +97,58 @@ class RunnerConfirm(unittest.TestCase):
         main = next(p for p in dirs if not p.name.endswith("-confirm"))
         confirm = next((p for p in dirs if p.name.endswith("-confirm")), None)
         return r.stdout, calls, main, confirm
+
+    def run_raw(self, version, mode="normal", **extra):
+        (self.T / "calls.json").unlink(missing_ok=True)
+        (self.T / "cluster.down").unlink(missing_ok=True)
+        env = {**os.environ, "PATH": f"{self.T / 'bin'}:{os.environ['PATH']}", "STUB_DIR": str(self.T),
+               "STUB_MODE": mode, "MATRIX_FILE": str(self.T / "matrix.yaml"), "VERSION": version,
+               "REPEATS": "3", "CAPTURED_AT": "2026-01-01T00:00:00Z", "DRIVER_SETTLE_SECONDS": "0",
+               "UPSTREAM_SETTLE_SECONDS": "0", "PYTHONDONTWRITEBYTECODE": "1", **extra}
+        r = subprocess.run(["bash", "run_release_baseline.sh"], cwd=self.T, env=env, capture_output=True, text=True)
+        main = next(iter(sorted((self.T / "results" / "releases").glob(f"{version}_*"))), None)
+        return r, main
+
+    def test_a_cluster_that_becomes_unreachable_stops_the_run_but_keeps_what_was_collected(self):
+        # Seen on the real cluster: the SSO session expired in the middle of a long run, kubectl failed, the
+        # runner crashed on an unset variable and nothing was aggregated.
+        self.baseline()
+        r, main = self.run_raw("cut", STUB_DOWN_AFTER="4")
+        self.assertEqual(r.returncode, 3, r.stdout[-800:] + r.stderr[-800:])
+        self.assertIn("kubectl cannot reach the cluster", r.stderr)
+        self.assertIn("RUN INCOMPLETE", r.stderr)
+        self.assertNotIn("unbound variable", r.stderr)
+        logs = sorted(p.name for p in main.glob("*__run*.log") if not p.name.endswith(".driver.log"))
+        self.assertEqual(len(logs), 4)                               # four runs were started before it went dark
+        m = json.loads((main / "metrics.json").read_text())["scenarios"]   # ... and what was collected was aggregated
+        self.assertEqual(sum(v["repeats"] for v in m.values()), 3)  # the fourth died with the cluster: empty, ignored
+        self.assertIn("became unreachable while waiting", r.stderr)
+        self.assertTrue((main / "verdict.json").exists())
+        self.assertFalse((self.T / "results" / "releases" / f"{main.name}-confirm").exists())   # no re-run on a dead cluster
+
+    def test_an_empty_summary_is_warned_about_and_not_counted_as_a_repeat(self):
+        self.baseline()
+        # the cluster answers the probe but the pod log comes back empty for one run
+        stub = self.T / "run_ai_benchmark.sh"
+        stub.write_text(BENCH_STUB.replace('open(f"{T}/k6.out", "w").write(f"""',
+                                           'open(f"{T}/k6.out", "w").write("" if (scenario == "routing-ewma" and n == 2) else f"""'))
+        r, main = self.run_raw("empty")
+        self.assertEqual(r.returncode, 0, r.stdout[-600:] + r.stderr[-400:])
+        self.assertIn("is empty", r.stdout)
+        self.assertIn("ignoring routing-ewma__run2.log: empty summary", r.stdout + r.stderr)
+        m = json.loads((main / "metrics.json").read_text())["scenarios"]
+        self.assertEqual(m["routing-ewma"]["repeats"], 2)
+        self.assertEqual(m["token-chat-openai"]["repeats"], 3)
+
+    def test_an_unreachable_cluster_at_the_start_fails_fast_without_any_run(self):
+        (self.T / "calls.json").unlink(missing_ok=True)
+        (self.T / "cluster.down").write_text("x")
+        env = {**os.environ, "PATH": f"{self.T / 'bin'}:{os.environ['PATH']}", "STUB_DIR": str(self.T), "STUB_MODE": "normal",
+               "MATRIX_FILE": str(self.T / "matrix.yaml"), "VERSION": "dead", "REPEATS": "3", "DRIVER_SETTLE_SECONDS": "0",
+               "PYTHONDONTWRITEBYTECODE": "1"}
+        r = subprocess.run(["bash", "run_release_baseline.sh"], cwd=self.T, env=env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 3)
+        self.assertFalse((self.T / "calls.json").exists())           # not a single benchmark was started
 
     def baseline(self):
         out, calls, main, confirm = self.run_release("base", "normal")
