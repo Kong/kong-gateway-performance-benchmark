@@ -60,8 +60,11 @@ PY
 
 KUBECTL_STUB = r'''#!/bin/bash
 [ -e "$STUB_DIR/cluster.down" ] && exit 1      # credentials expired: every call fails
+if [ -s "$STUB_DIR/flaky" ] && [ "${1:-}" = get ] && [ "${2:-}" = ns ]; then   # a connection that times out N times
+  n=$(cat "$STUB_DIR/flaky"); echo $((n - 1)) > "$STUB_DIR/flaky"; [ "$n" -gt 0 ] && exit 1
+fi
 case "$*" in
-  "get ns k6 -o name") echo namespace/k6;;
+  "get ns k6 -o name"*) echo namespace/k6;;      # the runner may add flags such as --request-timeout
   "get pods -n k6 --no-headers") echo "k6-ai-benchmark-1-abcde 1/1 Running 0 1m";;
   get\ pod\ -n\ k6*jsonpath*) echo -n "Succeeded";;
   logs\ -n\ k6*) cat "$STUB_DIR/k6.out";;
@@ -89,7 +92,7 @@ class RunnerConfirm(unittest.TestCase):
         env = {**os.environ, "PATH": f"{self.T / 'bin'}:{os.environ['PATH']}", "STUB_DIR": str(self.T),
                "STUB_MODE": mode, "MATRIX_FILE": str(self.T / "matrix.yaml"), "VERSION": version,
                "REPEATS": "3", "CAPTURED_AT": "2026-01-01T00:00:00Z", "DRIVER_SETTLE_SECONDS": "0",
-               "UPSTREAM_SETTLE_SECONDS": "0", "PYTHONDONTWRITEBYTECODE": "1", **extra}
+               "UPSTREAM_SETTLE_SECONDS": "0", "PYTHONDONTWRITEBYTECODE": "1", "CLUSTER_CHECK_PAUSE": "0", **extra}
         r = subprocess.run(["bash", "run_release_baseline.sh"], cwd=self.T, env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout[-1500:] + r.stderr[-800:])
         calls = json.loads((self.T / "calls.json").read_text())
@@ -104,7 +107,7 @@ class RunnerConfirm(unittest.TestCase):
         env = {**os.environ, "PATH": f"{self.T / 'bin'}:{os.environ['PATH']}", "STUB_DIR": str(self.T),
                "STUB_MODE": mode, "MATRIX_FILE": str(self.T / "matrix.yaml"), "VERSION": version,
                "REPEATS": "3", "CAPTURED_AT": "2026-01-01T00:00:00Z", "DRIVER_SETTLE_SECONDS": "0",
-               "UPSTREAM_SETTLE_SECONDS": "0", "PYTHONDONTWRITEBYTECODE": "1", **extra}
+               "UPSTREAM_SETTLE_SECONDS": "0", "PYTHONDONTWRITEBYTECODE": "1", "CLUSTER_CHECK_PAUSE": "0", **extra}
         r = subprocess.run(["bash", "run_release_baseline.sh"], cwd=self.T, env=env, capture_output=True, text=True)
         main = next(iter(sorted((self.T / "results" / "releases").glob(f"{version}_*"))), None)
         return r, main
@@ -145,10 +148,22 @@ class RunnerConfirm(unittest.TestCase):
         (self.T / "cluster.down").write_text("x")
         env = {**os.environ, "PATH": f"{self.T / 'bin'}:{os.environ['PATH']}", "STUB_DIR": str(self.T), "STUB_MODE": "normal",
                "MATRIX_FILE": str(self.T / "matrix.yaml"), "VERSION": "dead", "REPEATS": "3", "DRIVER_SETTLE_SECONDS": "0",
-               "PYTHONDONTWRITEBYTECODE": "1"}
+               "PYTHONDONTWRITEBYTECODE": "1", "CLUSTER_CHECK_PAUSE": "0"}
         r = subprocess.run(["bash", "run_release_baseline.sh"], cwd=self.T, env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 3)
         self.assertFalse((self.T / "calls.json").exists())           # not a single benchmark was started
+
+    def test_a_connection_that_fails_a_few_times_is_retried_not_treated_as_unreachable(self):
+        (self.T / "flaky").write_text("2")                  # the first two reachability checks time out
+        out, calls, main, confirm = self.run_release("flaky", "normal", CLUSTER_CHECK_TRIES="5")
+        self.assertEqual(calls["token-chat-openai"], 3)       # the whole plan ran
+        self.assertNotIn("became unreachable", out)
+
+    def test_a_connection_that_keeps_failing_still_stops_after_the_tries(self):
+        (self.T / "flaky").write_text("99")
+        r, main = self.run_raw("flakydead", CLUSTER_CHECK_TRIES="3")
+        self.assertEqual(r.returncode, 3)
+        self.assertEqual(int((self.T / "flaky").read_text()), 99 - 3)   # exactly 3 attempts, then it gave up
 
     def baseline(self):
         out, calls, main, confirm = self.run_release("base", "normal")
