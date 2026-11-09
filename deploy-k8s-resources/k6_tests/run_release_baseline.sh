@@ -147,8 +147,17 @@ PY
 # A long run outlives short-lived credentials (an SSO session expired during an 8 h benchmark and the
 # runner crashed on an unset variable without aggregating anything). Check before every run, so an
 # unreachable cluster stops the run with a clear message and what was collected is still reported.
+#
+# One failed call is not "unreachable": the API server connection from a laptop/WSL is occasionally slow
+# or times out for a moment (two runs were stopped at 13/93 and 75/93 and a retry minutes later worked, with
+# valid credentials). Try CLUSTER_CHECK_TRIES times, CLUSTER_CHECK_PAUSE seconds apart, before giving up.
 cluster_reachable() {
-  kubectl get ns k6 -o name >/dev/null 2>&1
+  local i tries="${CLUSTER_CHECK_TRIES:-5}" pause="${CLUSTER_CHECK_PAUSE:-10}"
+  for ((i = 1; i <= tries; i++)); do
+    kubectl get ns k6 -o name --request-timeout=20s >/dev/null 2>&1 && return 0
+    ((i < tries)) && sleep "$pause"
+  done
+  return 1
 }
 
 run_one() {
