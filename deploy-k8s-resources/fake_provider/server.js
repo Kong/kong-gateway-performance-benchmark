@@ -2,13 +2,22 @@ const http = require('http')
 const { URL } = require('url')
 
 const port = Number(process.env.PORT || 8080)
-const defaultTtftMs = Number(process.env.FAKE_PROVIDER_DEFAULT_TTFT_MS || 100)
-const defaultTpotMs = Number(process.env.FAKE_PROVIDER_DEFAULT_TPOT_MS || 4)
-const defaultTokensPerChunk = Number(process.env.FAKE_PROVIDER_DEFAULT_TOKENS_PER_CHUNK || 16)
+const latencyProfileRaw = String(process.env.FAKE_PROVIDER_LATENCY_PROFILE || 'realistic').toLowerCase()
+const latencyProfile = latencyProfileRaw === 'mlflow50' ? 'mlflow50' : 'realistic'
+const profileDefaults = latencyProfile === 'mlflow50'
+  ? { ttftMs: 50, tpotMs: 0, tokensPerChunk: 16 }
+  : { ttftMs: 100, tpotMs: 4, tokensPerChunk: 16 }
+const defaultTtftMs = Number(process.env.FAKE_PROVIDER_DEFAULT_TTFT_MS || profileDefaults.ttftMs)
+const defaultTpotMs = Number(process.env.FAKE_PROVIDER_DEFAULT_TPOT_MS || profileDefaults.tpotMs)
+const defaultTokensPerChunk = Number(process.env.FAKE_PROVIDER_DEFAULT_TOKENS_PER_CHUNK || profileDefaults.tokensPerChunk)
 const defaultChatCompletionTokens = Number(process.env.FAKE_PROVIDER_DEFAULT_CHAT_COMPLETION_TOKENS || 128)
 const defaultEmbeddingDimensions = Number(process.env.FAKE_PROVIDER_DEFAULT_EMBEDDING_DIMENSIONS || 12)
+const defaultEmbeddingDelayMode = String(
+  process.env.FAKE_PROVIDER_EMBEDDING_DELAY_MODE || (latencyProfile === 'mlflow50' ? 'ttft' : 'half_ttft'),
+).toLowerCase()
 const responseModel = process.env.FAKE_PROVIDER_MODEL || 'mock-gpt-4o-mini'
 const geminiModel = process.env.FAKE_PROVIDER_GEMINI_MODEL || 'mock-gemini-2.5-flash'
+const anthropicModel = process.env.FAKE_PROVIDER_ANTHROPIC_MODEL || 'mock-claude-sonnet-4'
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -109,6 +118,38 @@ function textFromGeminiContents(contents) {
     .join(' ')
 }
 
+function textFromAnthropicMessages(messages) {
+  if (!Array.isArray(messages)) {
+    return ''
+  }
+
+  return messages
+    .map(message => {
+      if (!message || typeof message !== 'object') {
+        return ''
+      }
+
+      if (typeof message.content === 'string') {
+        return message.content
+      }
+
+      if (Array.isArray(message.content)) {
+        return message.content
+          .map(entry => {
+            if (!entry || typeof entry !== 'object') {
+              return ''
+            }
+
+            return typeof entry.text === 'string' ? entry.text : ''
+          })
+          .join(' ')
+      }
+
+      return ''
+    })
+    .join(' ')
+}
+
 function estimatePromptTokens(text) {
   if (!text) {
     return 1
@@ -130,7 +171,9 @@ function resolvePromptTokens(req, body, mode) {
 
   const text = mode === 'gemini'
     ? textFromGeminiContents(body.contents)
-    : textFromOpenAIMessages(body.messages)
+    : mode === 'anthropic'
+      ? textFromAnthropicMessages(body.messages)
+      : textFromOpenAIMessages(body.messages)
 
   return estimatePromptTokens(text)
 }
@@ -155,6 +198,20 @@ function resolveTiming(req) {
     tpotMs: Math.max(0, getHeaderNumber(req, 'x-llm-tpot-ms', defaultTpotMs)),
     tokensPerChunk: Math.max(1, Math.floor(getHeaderNumber(req, 'x-llm-tokens-per-chunk', defaultTokensPerChunk))),
   }
+}
+
+function resolveEmbeddingDelayMs(req) {
+  const explicitDelay = getHeaderNumber(req, 'x-llm-embedding-delay-ms', NaN)
+  if (Number.isFinite(explicitDelay)) {
+    return Math.max(0, Math.floor(explicitDelay))
+  }
+
+  const ttftMs = Math.max(0, getHeaderNumber(req, 'x-llm-ttft-ms', defaultTtftMs))
+  if (defaultEmbeddingDelayMode === 'ttft') {
+    return Math.floor(ttftMs)
+  }
+
+  return Math.max(10, Math.floor(ttftMs / 2))
 }
 
 function embeddingInputAt(bodyInput, index) {
@@ -205,6 +262,27 @@ function buildOpenAiChatResponse(promptTokens, completionTokens, responseText, m
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
       total_tokens: promptTokens + completionTokens,
+    },
+  }
+}
+
+function buildAnthropicMessageResponse(promptTokens, completionTokens, responseText, model = anthropicModel) {
+  return {
+    id: `msg_${Date.now()}`,
+    type: 'message',
+    role: 'assistant',
+    model: model || anthropicModel,
+    content: [
+      {
+        type: 'text',
+        text: responseText,
+      },
+    ],
+    stop_reason: 'end_turn',
+    stop_sequence: null,
+    usage: {
+      input_tokens: promptTokens,
+      output_tokens: completionTokens,
     },
   }
 }
@@ -308,6 +386,92 @@ async function sendGeminiStream(res, promptTokens, completionTokens, timing) {
   res.end()
 }
 
+async function sendAnthropicStream(res, promptTokens, completionTokens, timing, model = anthropicModel) {
+  const createdAt = new Date().toISOString()
+  const streamId = `msg_${Date.now()}`
+  const tokens = paddedTokens(completionTokens)
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+  })
+
+  res.write('event: message_start\n')
+  res.write(`data: ${JSON.stringify({
+    type: 'message_start',
+    message: {
+      id: streamId,
+      type: 'message',
+      role: 'assistant',
+      model: model || anthropicModel,
+      content: [],
+      stop_reason: null,
+      stop_sequence: null,
+      usage: {
+        input_tokens: promptTokens,
+        output_tokens: 0,
+      },
+    },
+  })}\n\n`)
+
+  res.write('event: content_block_start\n')
+  res.write(`data: ${JSON.stringify({
+    type: 'content_block_start',
+    index: 0,
+    content_block: {
+      type: 'text',
+      text: '',
+    },
+  })}\n\n`)
+
+  await sleep(timing.ttftMs)
+
+  for (let index = 0; index < tokens.length; index += timing.tokensPerChunk) {
+    const chunkTokens = tokens.slice(index, index + timing.tokensPerChunk)
+    res.write('event: content_block_delta\n')
+    res.write(`data: ${JSON.stringify({
+      type: 'content_block_delta',
+      index: 0,
+      delta: {
+        type: 'text_delta',
+        text: chunkTokens.join(' '),
+      },
+    })}\n\n`)
+
+    if (index + timing.tokensPerChunk < tokens.length) {
+      await sleep(timing.tpotMs * chunkTokens.length)
+    }
+  }
+
+  res.write('event: content_block_stop\n')
+  res.write(`data: ${JSON.stringify({
+    type: 'content_block_stop',
+    index: 0,
+  })}\n\n`)
+
+  res.write('event: message_delta\n')
+  res.write(`data: ${JSON.stringify({
+    type: 'message_delta',
+    delta: {
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+    },
+    usage: {
+      output_tokens: completionTokens,
+    },
+  })}\n\n`)
+
+  res.write('event: message_stop\n')
+  res.write(`data: ${JSON.stringify({
+    type: 'message_stop',
+    id: streamId,
+    model: model || anthropicModel,
+    created_at: createdAt,
+  })}\n\n`)
+  res.end()
+}
+
 async function handleOpenAiChat(req, res, body) {
   const promptTokens = resolvePromptTokens(req, body, 'openai')
   const completionTokens = resolveCompletionTokens(req, body)
@@ -333,11 +497,28 @@ async function handleGeminiChat(req, res, body) {
   await sendGeminiStream(res, promptTokens, completionTokens, timing)
 }
 
+async function handleAnthropicMessages(req, res, body) {
+  const promptTokens = resolvePromptTokens(req, body, 'anthropic')
+  const completionTokens = resolveCompletionTokens(req, body)
+  const timing = resolveTiming(req)
+  const stream = body.stream === true || getHeaderBoolean(req, 'x-llm-stream')
+
+  if (stream) {
+    await sendAnthropicStream(res, promptTokens, completionTokens, timing, body.model)
+    return
+  }
+
+  const totalDelay = timing.ttftMs + (timing.tpotMs * completionTokens)
+  const responseText = paddedTokens(completionTokens).join(' ')
+  await sleep(totalDelay)
+  sendJson(res, 200, buildAnthropicMessageResponse(promptTokens, completionTokens, responseText, body.model))
+}
+
 async function handleOpenAiEmbeddings(req, res, body) {
   const promptTokens = resolvePromptTokens(req, { messages: [{ content: body.input }] }, 'openai')
   const totalItems = Array.isArray(body.input) ? body.input.length : 1
   const embeddingModel = body.model || 'text-embedding-3-small'
-  await sleep(Math.max(10, Math.floor(defaultTtftMs / 2)))
+  await sleep(resolveEmbeddingDelayMs(req))
 
   sendJson(res, 200, {
     object: 'list',
@@ -404,6 +585,11 @@ async function route(req, res) {
     return
   }
 
+  if (currentUrl.pathname === '/v1/messages') {
+    await handleAnthropicMessages(req, res, body)
+    return
+  }
+
   if (/^\/v1beta\/models\/[^:]+:streamGenerateContent$/.test(currentUrl.pathname)) {
     await handleGeminiChat(req, res, body)
     return
@@ -467,6 +653,8 @@ const server = http.createServer((req, res) => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`Fake provider listening on port ${port}`)
+  console.log(`Latency profile: ${latencyProfile}`)
   console.log(`OpenAI model: ${responseModel}`)
   console.log(`Gemini model: ${geminiModel}`)
+  console.log(`Anthropic model: ${anthropicModel}`)
 })

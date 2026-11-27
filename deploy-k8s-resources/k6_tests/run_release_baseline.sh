@@ -29,6 +29,11 @@
 #   ONLY_KEYS=a,b           run only these result keys (e.g. token-chat-openai__mlflow50) plus the entries
 #                           that share a group with them, i.e. their direct controls
 #                           (EXPAND_GROUPS=false: only the listed keys, e.g. when only the gateway's CPU matters).
+#   WARMUP_DURATION=30s     (default 30s) warm-up run before the FIRST timed run of every scenario/fixture pair: the same
+#                           k6 run, with this duration, whose result is thrown away. It fills lazy caches (KFC
+#                           code paths) so that round 1 is comparable with the later rounds. Default: the
+#                           `global.warmup_duration` of the SLO config, 30s now. WARMUP_DURATION=0s turns the warm-up off. Gateway and direct
+#                           entries are both warmed, so a pair stays symmetric. The warm-up is not in the CPU sample.
 #   DRY_RUN=true            print the plan and the time estimate, run nothing
 #                           (no cluster access, no output directory).
 #   CONFIRM_RERUN=true      (default) when the comparison with the baseline flags REGRESSION,
@@ -53,6 +58,7 @@ EXPAND_GROUPS="${EXPAND_GROUPS:-true}"
 TIER="${TIER:-tier2}"
 ORDER="${ORDER:-interleaved}"
 SEED="${SEED:-1}"
+WARMUP_DURATION="${WARMUP_DURATION:-}"
 DRY_RUN="${DRY_RUN:-false}"
 INTERRUPTED=0
 CONFIRM_RERUN="${CONFIRM_RERUN:-true}"
@@ -83,6 +89,24 @@ if [ ! -f "$MATRIX_FILE" ]; then
   exit 2
 fi
 
+# Warm-up length: WARMUP_DURATION, else global.warmup_duration of the SLO config, else 0s.
+if [[ -z "$WARMUP_DURATION" ]]; then
+  WARMUP_DURATION=$(python3 - "$SLO_CONFIG_FILE" <<'PY'
+import sys
+try:
+    import yaml
+    print(yaml.safe_load(open(sys.argv[1])).get("global", {}).get("warmup_duration", "0s"))
+except Exception:
+    print("0s")
+PY
+  ) || WARMUP_DURATION="0s"
+fi
+if ! [[ "$WARMUP_DURATION" =~ ^(0|[0-9]+[smh])$ ]]; then
+  echo "ERROR: WARMUP_DURATION must be 0 or a number with s, m or h (for example 30s), got '$WARMUP_DURATION'" >&2
+  exit 2
+fi
+warmup_enabled() { [[ "$WARMUP_DURATION" != "0" && "$WARMUP_DURATION" != 0[smh] ]]; }
+
 if ! [[ "$REPEATS" =~ ^[1-9][0-9]*$ ]]; then
   echo "ERROR: REPEATS must be a positive integer, got '$REPEATS'" >&2
   exit 2
@@ -106,6 +130,7 @@ echo "=== Absolute SLO config: $SLO_CONFIG_FILE ==="
 echo "=== INCLUDE_MLFLOW50_TRACK: $INCLUDE_MLFLOW50_TRACK  INCLUDE_PENDING: $INCLUDE_PENDING ==="
 echo "=== Matrix: $MATRIX_FILE ==="
 echo "=== Plan: $SUMMARY (seed=$SEED) ==="
+if warmup_enabled; then echo "=== Warm-up: $WARMUP_DURATION before the first timed run of every scenario/fixture pair (not counted) ==="; else echo "=== Warm-up: off ==="; fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "=== DRY_RUN: nothing will be executed ==="
@@ -160,9 +185,49 @@ cluster_reachable() {
   return 1
 }
 
+# Wait until the k6 runner pod of the current TestRun has finished. Sets RUNNER_POD and RUNNER_PHASE
+# (phase stays empty when the pod never showed up or did not finish in time).
+wait_for_runner_pod() {
+  local i
+  RUNNER_POD=""; RUNNER_PHASE=""
+  for i in $(seq 1 80); do
+    RUNNER_POD=$(kubectl get pods -n k6 --no-headers 2>/dev/null | grep -E "k6-ai-benchmark-1" | head -1 | awk '{print $1}')
+    if [ -z "$RUNNER_POD" ]; then
+      # no pod yet: normal at the start of a run, but not worth 400 s of polling when the cluster is gone
+      cluster_reachable || { echo "    WARNING: the cluster became unreachable while waiting for the runner pod" >&2; break; }
+      sleep 5
+      continue
+    fi
+    RUNNER_PHASE=$(kubectl get pod -n k6 "$RUNNER_POD" -o jsonpath='{.status.phase}' 2>/dev/null)
+    { [ "$RUNNER_PHASE" = "Succeeded" ] || [ "$RUNNER_PHASE" = "Failed" ]; } && break
+    sleep 6
+  done
+}
+
+# Warm up once for each scenario/fixture pair, before its first timed run. The result is not saved.
+declare -A WARMED=()
+warm_up() {
+  local scenario="$1" fixture="$2" load="$3" scenario_key="$4"
+  warmup_enabled || return 0
+  local wkey="$scenario:$fixture"
+  [[ -n "${WARMED[$wkey]:-}" ]] && return 0
+  WARMED["$wkey"]=1
+  echo "--- warm-up $scenario ($fixture)  (load=$load, $WARMUP_DURATION, not counted) ---"
+  {
+    echo "[driver] deleting previous testruns"
+    kubectl delete testrun -n k6 --all --ignore-not-found
+    sleep "$DRIVER_SETTLE_SECONDS"
+    echo "[driver] warm-up scenario=$scenario fixture=$fixture load=$load duration=$WARMUP_DURATION"
+    bash run_ai_benchmark.sh "$scenario" "$fixture" "$load" "$WARMUP_DURATION"
+  } >"$OUTDIR/${scenario_key}__warmup.driver.log" 2>&1
+  wait_for_runner_pod
+  echo "    warm-up finished (phase=${RUNNER_PHASE:-unknown})"
+}
+
 run_one() {
   local r="$1" scenario="$2" fixture="$3" load="$4" scenario_key="$5"
   local run_driver_log rp="" ph="" cpu_before cpu_after
+  warm_up "$scenario" "$fixture" "$load" "$scenario_key"
   echo "--- $scenario ($fixture) repeat $r/$REPEATS  (load=$load, $DURATION) ---"
   run_driver_log="$OUTDIR/${scenario_key}__run${r}.driver.log"
   if [[ "$scenario" == *-disconnect ]]; then
@@ -181,19 +246,8 @@ run_one() {
     bash run_ai_benchmark.sh "$scenario" "$fixture" "$load" "$DURATION"
   } >"$run_driver_log" 2>&1
   # wait for the runner pod to finish
-  rp=""
-  for i in $(seq 1 80); do
-    rp=$(kubectl get pods -n k6 --no-headers 2>/dev/null | grep -E "k6-ai-benchmark-1" | head -1 | awk '{print $1}')
-    if [ -z "$rp" ]; then
-      # no pod yet: normal at the start of a run, but not worth 400 s of polling when the cluster is gone
-      cluster_reachable || { echo "    WARNING: the cluster became unreachable while waiting for the runner pod" >&2; break; }
-      sleep 5
-      continue
-    fi
-    ph=$(kubectl get pod -n k6 "$rp" -o jsonpath='{.status.phase}' 2>/dev/null)
-    { [ "$ph" = "Succeeded" ] || [ "$ph" = "Failed" ]; } && break
-    sleep 6
-  done
+  wait_for_runner_pod
+  rp="$RUNNER_POD"; ph="$RUNNER_PHASE"
   # save this repeat's summary
   kubectl logs -n k6 "$rp" 2>/dev/null | \
     grep -E "$RUN_LOG_PATTERN" \

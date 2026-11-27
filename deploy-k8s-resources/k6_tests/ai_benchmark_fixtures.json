@@ -20,6 +20,77 @@
       "ttft_ms": 150,
       "tpot_ms": 5,
       "tokens_per_chunk": 32
+    },
+    "mlflow50": {
+      "prompt_tokens": 64,
+      "completion_tokens": 128,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16
+    },
+    "req1k": {
+      "prompt_tokens": 154,
+      "completion_tokens": 128,
+      "ttft_ms": 100,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 16,
+      "label": "1k"
+    },
+    "mlflow50-req1k": {
+      "prompt_tokens": 154,
+      "completion_tokens": 128,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16,
+      "label": "1k"
+    },
+    "req4k": {
+      "prompt_tokens": 666,
+      "completion_tokens": 128,
+      "ttft_ms": 100,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 16,
+      "label": "4k"
+    },
+    "mlflow50-req4k": {
+      "prompt_tokens": 666,
+      "completion_tokens": 128,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16,
+      "label": "4k"
+    },
+    "req10k": {
+      "prompt_tokens": 1690,
+      "completion_tokens": 128,
+      "ttft_ms": 100,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 16,
+      "label": "10k"
+    },
+    "mlflow50-req10k": {
+      "prompt_tokens": 1690,
+      "completion_tokens": 128,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16,
+      "label": "10k"
+    },
+    "req16k": {
+      "prompt_tokens": 2714,
+      "completion_tokens": 128,
+      "ttft_ms": 100,
+      "tpot_ms": 4,
+      "tokens_per_chunk": 16,
+      "label": "16k"
+    },
+    "mlflow50-req16k": {
+      "prompt_tokens": 2714,
+      "completion_tokens": 128,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16,
+      "label": "16k"
     }
   },
   "stream": {
@@ -43,6 +114,77 @@
       "ttft_ms": 180,
       "tpot_ms": 6,
       "tokens_per_chunk": 32
+    },
+    "mlflow50": {
+      "prompt_tokens": 64,
+      "completion_tokens": 256,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16
+    },
+    "req1k": {
+      "prompt_tokens": 147,
+      "completion_tokens": 256,
+      "ttft_ms": 120,
+      "tpot_ms": 5,
+      "tokens_per_chunk": 16,
+      "label": "1k"
+    },
+    "mlflow50-req1k": {
+      "prompt_tokens": 147,
+      "completion_tokens": 256,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16,
+      "label": "1k"
+    },
+    "req4k": {
+      "prompt_tokens": 659,
+      "completion_tokens": 256,
+      "ttft_ms": 120,
+      "tpot_ms": 5,
+      "tokens_per_chunk": 16,
+      "label": "4k"
+    },
+    "mlflow50-req4k": {
+      "prompt_tokens": 659,
+      "completion_tokens": 256,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16,
+      "label": "4k"
+    },
+    "req10k": {
+      "prompt_tokens": 1683,
+      "completion_tokens": 256,
+      "ttft_ms": 120,
+      "tpot_ms": 5,
+      "tokens_per_chunk": 16,
+      "label": "10k"
+    },
+    "mlflow50-req10k": {
+      "prompt_tokens": 1683,
+      "completion_tokens": 256,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16,
+      "label": "10k"
+    },
+    "req16k": {
+      "prompt_tokens": 2707,
+      "completion_tokens": 256,
+      "ttft_ms": 120,
+      "tpot_ms": 5,
+      "tokens_per_chunk": 16,
+      "label": "16k"
+    },
+    "mlflow50-req16k": {
+      "prompt_tokens": 2707,
+      "completion_tokens": 256,
+      "ttft_ms": 50,
+      "tpot_ms": 0,
+      "tokens_per_chunk": 16,
+      "label": "16k"
     }
   },
   "embeddings": {
@@ -54,6 +196,11 @@
     },
     "long": {
       "prompt_tokens": 4096
+    },
+    "mlflow50": {
+      "prompt_tokens": 256,
+      "ttft_ms": 50,
+      "tpot_ms": 0
     }
   },
   "static": {

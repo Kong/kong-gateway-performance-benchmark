@@ -19,7 +19,8 @@
 #              planned for its first cluster smoke run with INCLUDE_PENDING=true
 #              (e.g. TIER=tier1 INCLUDE_PENDING=true REPEATS=1 ./run_release_baseline.sh).
 #              No entry is pending at the moment: the eight added with the HTTP-entry / churn /
-#              disconnect work all ran cleanly on the cluster (2026-11-05) and are enabled.
+#              disconnect work (2026-11-05) and the 32 request-size entries (fixture req1k ... req16k,
+#              AG-2333; smoke run on the cluster 2026-11-26, 32 of 32 clean) are enabled.
 #
 # The result key (log file / metrics.json name) is derived exactly as before:
 #   fixture == short -> <scenario>      otherwise -> <scenario>__<fixture>
@@ -78,3 +79,44 @@ entries:
   - {scenario: embeddings-openai,         fixture: mlflow50, load: 50, track: mlflow50, group: overhead-embeddings-mlflow50, tier1: true}
   - {scenario: embeddings-openai-http,    fixture: mlflow50, load: 50, track: mlflow50, group: overhead-embeddings-mlflow50, tier1: true}
   - {scenario: direct-embeddings-openai,  fixture: mlflow50, load: 50, track: mlflow50, group: overhead-embeddings-mlflow50, tier1: true}
+
+  # ---- request-size tiers (AG-2333) ----------------------------------------
+  # Request body of about 1 KB / 4 KB / 10 KB / 16 KB. Buffered response = token-chat-openai,
+  # SSE response = stream-openai. Each gateway entry has a direct control in the same group.
+  # Enabled after a 1-repeat smoke run on the cluster (2026-11-26) ran all 32 entries cleanly.
+
+  # core track
+  - {scenario: token-chat-openai, fixture: req1k, load: 50, track: core, group: overhead-token-req1k, enabled: true}
+  - {scenario: direct-token-chat-openai, fixture: req1k, load: 50, track: core, group: overhead-token-req1k, enabled: true}
+  - {scenario: stream-openai, fixture: req1k, load: 30, track: core, group: overhead-stream-openai-req1k, enabled: true}
+  - {scenario: direct-stream-openai, fixture: req1k, load: 30, track: core, group: overhead-stream-openai-req1k, enabled: true}
+  - {scenario: token-chat-openai, fixture: req4k, load: 50, track: core, group: overhead-token-req4k, enabled: true}
+  - {scenario: direct-token-chat-openai, fixture: req4k, load: 50, track: core, group: overhead-token-req4k, enabled: true}
+  - {scenario: stream-openai, fixture: req4k, load: 30, track: core, group: overhead-stream-openai-req4k, enabled: true}
+  - {scenario: direct-stream-openai, fixture: req4k, load: 30, track: core, group: overhead-stream-openai-req4k, enabled: true}
+  - {scenario: token-chat-openai, fixture: req10k, load: 50, track: core, group: overhead-token-req10k, enabled: true}
+  - {scenario: direct-token-chat-openai, fixture: req10k, load: 50, track: core, group: overhead-token-req10k, enabled: true}
+  - {scenario: stream-openai, fixture: req10k, load: 30, track: core, group: overhead-stream-openai-req10k, enabled: true}
+  - {scenario: direct-stream-openai, fixture: req10k, load: 30, track: core, group: overhead-stream-openai-req10k, enabled: true}
+  - {scenario: token-chat-openai, fixture: req16k, load: 50, track: core, group: overhead-token-req16k, enabled: true}
+  - {scenario: direct-token-chat-openai, fixture: req16k, load: 50, track: core, group: overhead-token-req16k, enabled: true}
+  - {scenario: stream-openai, fixture: req16k, load: 30, track: core, group: overhead-stream-openai-req16k, enabled: true}
+  - {scenario: direct-stream-openai, fixture: req16k, load: 30, track: core, group: overhead-stream-openai-req16k, enabled: true}
+
+  # mlflow50 track
+  - {scenario: token-chat-openai, fixture: mlflow50-req1k, load: 50, track: mlflow50, group: overhead-token-mlflow50-req1k, enabled: true}
+  - {scenario: direct-token-chat-openai, fixture: mlflow50-req1k, load: 50, track: mlflow50, group: overhead-token-mlflow50-req1k, enabled: true}
+  - {scenario: stream-openai, fixture: mlflow50-req1k, load: 30, track: mlflow50, group: overhead-stream-openai-mlflow50-req1k, enabled: true}
+  - {scenario: direct-stream-openai, fixture: mlflow50-req1k, load: 30, track: mlflow50, group: overhead-stream-openai-mlflow50-req1k, enabled: true}
+  - {scenario: token-chat-openai, fixture: mlflow50-req4k, load: 50, track: mlflow50, group: overhead-token-mlflow50-req4k, enabled: true}
+  - {scenario: direct-token-chat-openai, fixture: mlflow50-req4k, load: 50, track: mlflow50, group: overhead-token-mlflow50-req4k, enabled: true}
+  - {scenario: stream-openai, fixture: mlflow50-req4k, load: 30, track: mlflow50, group: overhead-stream-openai-mlflow50-req4k, enabled: true}
+  - {scenario: direct-stream-openai, fixture: mlflow50-req4k, load: 30, track: mlflow50, group: overhead-stream-openai-mlflow50-req4k, enabled: true}
+  - {scenario: token-chat-openai, fixture: mlflow50-req10k, load: 50, track: mlflow50, group: overhead-token-mlflow50-req10k, enabled: true}
+  - {scenario: direct-token-chat-openai, fixture: mlflow50-req10k, load: 50, track: mlflow50, group: overhead-token-mlflow50-req10k, enabled: true}
+  - {scenario: stream-openai, fixture: mlflow50-req10k, load: 30, track: mlflow50, group: overhead-stream-openai-mlflow50-req10k, enabled: true}
+  - {scenario: direct-stream-openai, fixture: mlflow50-req10k, load: 30, track: mlflow50, group: overhead-stream-openai-mlflow50-req10k, enabled: true}
+  - {scenario: token-chat-openai, fixture: mlflow50-req16k, load: 50, track: mlflow50, group: overhead-token-mlflow50-req16k, enabled: true}
+  - {scenario: direct-token-chat-openai, fixture: mlflow50-req16k, load: 50, track: mlflow50, group: overhead-token-mlflow50-req16k, enabled: true}
+  - {scenario: stream-openai, fixture: mlflow50-req16k, load: 30, track: mlflow50, group: overhead-stream-openai-mlflow50-req16k, enabled: true}
+  - {scenario: direct-stream-openai, fixture: mlflow50-req16k, load: 30, track: mlflow50, group: overhead-stream-openai-mlflow50-req16k, enabled: true}

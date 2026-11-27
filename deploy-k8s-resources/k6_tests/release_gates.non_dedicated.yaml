@@ -1,0 +1,46 @@
+# =============================================================================
+# Release Regression Gates (Non-Dedicated Environment)
+# =============================================================================
+# Use this profile when perf tests run on shared/non-isolated machines.
+# It keeps gate semantics identical to release_gates.yaml but widens tolerances
+# and tightens statistical checks to reduce false positives from infra noise.
+#
+# Direction semantics per metric:
+#   latency / ttft / error_rate : HIGHER is worse  (regression if it goes up)
+#   throughput (rps)            : LOWER  is worse  (regression if it goes down)
+# =============================================================================
+
+# Default tolerances for noisy/shared environments.
+defaults:
+  p95_ms:         { warn_pct: 8,  fail_pct: 20 }
+  p99_ms:         { warn_pct: 12, fail_pct: 30 }
+  ttft_p95_ms:    { warn_pct: 8,  fail_pct: 20 }   # streaming only
+  throughput_rps: { warn_pct: 8,  fail_pct: 15 }   # drop beyond this = regression
+  error_rate_pct: { warn_abs: 0.5, fail_abs: 1.5 } # absolute points, not %
+  cpu_seconds_per_1k_req: { warn_pct: 15, fail_pct: 30 }  # Kong CPU per 1k requests; only checked when both runs carry infra data
+
+# Gateway overhead (gateway - direct, same-run pairs) now vs the baseline's overhead,
+# in ABSOLUTE milliseconds. At ~1 ms of overhead a percentage gate would be noise.
+# Measured run-to-run spread of the paired overhead: sd 0.07-0.33 ms (p95),
+# 0.1-0.3 ms (p99), 0.06 ms (streaming TTFT). Provisional until an A/A calibration.
+overhead:
+  p95_ms:      { warn_abs_ms: 1.0, fail_abs_ms: 3.0 }
+  p99_ms:      { warn_abs_ms: 2.0, fail_abs_ms: 6.0 }
+  ttft_p95_ms: { warn_abs_ms: 1.0, fail_abs_ms: 3.0 }
+
+# Ignore tiny absolute latency shifts that are mostly scheduling noise.
+noise_floor:
+  latency_ms: 40
+
+# Per-scenario overrides (optional).
+scenarios:
+  stream-openai:
+    ttft_p95_ms: { warn_pct: 8, fail_pct: 20 }
+  stream-gemini:
+    ttft_p95_ms: { warn_pct: 8, fail_pct: 20 }
+
+# Statistical-validity gate for shared hosts.
+# Recommend running 6 rounds and treating 1st as warm-up; compare at least 5.
+stability:
+  min_repeats: 5
+  max_coefficient_of_variation_percent: 20.0

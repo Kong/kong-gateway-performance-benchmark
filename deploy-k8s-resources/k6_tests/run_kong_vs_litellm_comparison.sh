@@ -123,6 +123,30 @@ SCENARIOS["embeddings-openai"]="
 "
 
 # Scenario: policy-auth (authentication overhead)
+
+# Scenario: token-chat-mlflow50 (pure gateway overhead isolation)
+SCENARIOS["token-chat-openai:mlflow50"]="
+  script=k6_ai_token_chat.js
+  kong_url=${KONG_PROXY_URL}/bench/token/chat/openai
+  litellm_url=${LITELLM_PROXY_URL}/chat/completions
+  fixture=mlflow50
+  load_type=rps
+  load_points=50
+  description=Pure gateway overhead (mlflow50 50ms fixed upstream)
+  expected_winner=Kong (lower processing overhead)
+"
+
+# Scenario: embeddings-mlflow50 (pure gateway overhead for embeddings)
+SCENARIOS["embeddings-openai:mlflow50"]="
+  script=k6_ai_embeddings.js
+  kong_url=${KONG_PROXY_URL}/bench/token/embeddings/openai
+  litellm_url=${LITELLM_PROXY_URL}/embeddings
+  fixture=mlflow50
+  load_type=rps
+  load_points=50
+  description=Pure gateway overhead for embeddings (mlflow50)
+  expected_winner=Kong (lower overhead)
+"
 SCENARIOS["policy-auth"]="
   script=k6_ai_token_chat.js
   kong_url=${KONG_PROXY_URL}/bench/policy/auth/openai
@@ -162,7 +186,7 @@ check_gateway_health() {
   fi
   
   local status
-  status=$(curl "${curl_args[@]}" "$url/health" 2>/dev/null || echo "000")
+  status=$(curl "${curl_args[@]}" "$url/v1/status" 2>/dev/null || echo "000")
   
   # LiteLLM returns 401 without auth, Kong returns various codes
   if [[ "$status" == "200" || "$status" == "401" || "$status" == "404" ]]; then
@@ -493,8 +517,8 @@ main() {
   
   # Default to all scenarios if none specified
   if [[ ${#scenarios_to_run[@]} -eq 0 ]] || [[ "$run_all" == "true" ]]; then
-    scenarios_to_run=("token-chat-openai" "stream-openai" "embeddings-openai")
-    # Uncomment below to include all scenarios by default
+    scenarios_to_run=("${!SCENARIOS[@]}")
+    # Removed policy-auth (not equivalent) and using mlflow50 for overhead isolation
     # scenarios_to_run=("${!SCENARIOS[@]}")
   fi
   

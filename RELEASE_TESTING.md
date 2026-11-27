@@ -42,6 +42,38 @@ error-rate +1.0pt. Latency regressions below a 20 ms absolute floor are ignored 
 The overhead budgets and tolerances are provisional until an A/A calibration (the same release twice on the same
 topology) measures the real noise floor; so far the paired p95 overhead has a run-to-run sd of 0.07–0.33 ms.
 
+## Non-dedicated environment profile
+When tests run on shared/non-isolated machines, use this profile for noisy infra:
+`deploy-k8s-resources/k6_tests/release_gates.non_dedicated.yaml`
+
+Key differences vs default gates:
+- Wider relative tolerances (p95 +20%, p99 +30%, TTFT +20%, throughput -15%)
+- Higher absolute latency noise floor (40 ms)
+- Stronger statistical requirement (`min_repeats: 5`, `max_cv: 20%`)
+
+Manual compare example:
+```bash
+python3 compare_release.py \
+  --current  results/releases/ai-2.0.0-rc.3_2026-06-23 \
+  --baseline results/releases/ai-2.0.0-rc.2_2026-06-16 \
+  --gates release_gates.non_dedicated.yaml \
+  --out report.md --json verdict.json
+```
+
+Recommended run discipline for non-dedicated hosts:
+- Run 6 rounds per scenario. Every round counts: round 1 is not discarded (at 50 RPS it differs from the
+  later rounds by < 0.5 ms; see "Run matrix, tiers and ordering"). Use a k6 warm-up only for high-load tests.
+- Use at least 5 valid repeats for release decisions.
+- If verdict is `UNSTABLE`, re-run before escalating to dev.
+
+Convenience wrapper:
+```bash
+cd deploy-k8s-resources/k6_tests
+VERSION=ai-2.0.0-rc.4 REPEATS=6 DURATION=3m ./run_release_baseline_non_dedicated.sh
+```
+The wrapper sets `RELEASE_GATES_PATH` to
+`release_gates.non_dedicated.yaml` automatically.
+
 ## Test cluster topology
 - **One availability zone.** All managed node groups run in a single AZ (`pin_nodes_to_single_az`, default true;
   `node_az_index` picks which, 0 = the NAT gateway's AZ). The subnets span three AZs and each node group's node used

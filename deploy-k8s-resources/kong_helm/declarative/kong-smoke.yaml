@@ -1,0 +1,41 @@
+# Minimal DB-less declarative config to validate the KIC-bypass path end-to-end.
+# Mirrors the ai-benchmark-token-chat-openai KongPlugin + Ingress from
+# ai-benchmark-suite.yaml. Pushed to Kong's admin /config endpoint.
+_format_version: "3.0"
+
+services:
+  - name: bench-token-chat-openai
+    # ai-proxy-advanced terminates the request and proxies to the model
+    # upstream_url, so this service URL is only a structural placeholder.
+    url: http://fake-provider.upstream.svc.cluster.local:8080
+    routes:
+      - name: bench-token-chat-openai
+        paths:
+          - /bench/token/chat/openai
+        strip_path: false
+        plugins:
+          - name: ai-proxy-advanced
+            config:
+              llm_format: openai
+              response_streaming: allow
+              max_request_body_size: 10485760
+              model_name_header: true
+              balancer:
+                algorithm: round-robin
+                retries: 1
+                slots: 1000
+                connect_timeout: 60000
+                read_timeout: 60000
+                write_timeout: 60000
+              targets:
+                - route_type: llm/v1/chat
+                  auth:
+                    allow_override: false
+                  logging:
+                    log_payloads: false
+                    log_statistics: true
+                  model:
+                    provider: openai
+                    name: mock-gpt-4o-mini
+                    options:
+                      upstream_url: http://fake-provider.upstream.svc.cluster.local:8080/v1/chat/completions

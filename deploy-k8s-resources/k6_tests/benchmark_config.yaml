@@ -21,12 +21,16 @@ global:
   # suggest environmental noise or inconsistent behavior.
   max_coefficient_of_variation_percent: 15.0
   
-  # Run windows. NOT read by any script today: the release runner takes the run
-  # length from DURATION (default 3m) and runs without a warm-up, because the
-  # measured difference between the first and the later repeats at 50 RPS is
-  # below 0.5 ms. These values document what the release profile actually uses;
-  # a k6 warm-up is planned for the high-load (breakpoint) tests only.
-  warmup_duration: 0s
+  # Run windows. warmup_duration is read by run_release_baseline.sh (WARMUP_DURATION overrides it):
+  # a warm-up run of this length, thrown away, before the first timed run of every scenario/fixture
+  # pair. 0s = no warm-up (WARMUP_DURATION=0s). KFC fills some caches lazily, so the first timed
+  # repeat can be slower than the later ones (AG-2333). Baselines captured before this default
+  # (up to 2.3.0-rc.2) had no warm-up: the measured difference between the first and the later
+  # repeats at 50 RPS was below 0.5 ms without KFC. Re-capture the baseline when comparing
+  # across this change. 30s is a first value: check the first round against the later rounds.
+  # steady_state_duration and cooldown_duration are NOT read by any script: the release runner
+  # takes the run length from DURATION (default 3m) and has no cooldown.
+  warmup_duration: 30s
   steady_state_duration: 3m
   cooldown_duration: 0s
 

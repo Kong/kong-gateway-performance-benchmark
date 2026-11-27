@@ -80,6 +80,9 @@ class RunnerConfirm(unittest.TestCase):
         self.T = Path(self._tmp.name)
         for name in COPY:
             shutil.copy(K6_TESTS / name, self.T / name)
+        # the stubs count every call: run without a warm-up unless a test asks for one
+        cfg = self.T / "benchmark_config.yaml"
+        cfg.write_text(cfg.read_text().replace("warmup_duration: 30s", "warmup_duration: 0s"))
         (self.T / "matrix.yaml").write_text(MATRIX)
         (self.T / "run_ai_benchmark.sh").write_text(BENCH_STUB)
         (self.T / "bin").mkdir()
@@ -164,6 +167,48 @@ class RunnerConfirm(unittest.TestCase):
         r, main = self.run_raw("flakydead", CLUSTER_CHECK_TRIES="3")
         self.assertEqual(r.returncode, 3)
         self.assertEqual(int((self.T / "flaky").read_text()), 99 - 3)   # exactly 3 attempts, then it gave up
+
+    def test_warm_up_runs_once_per_scenario_and_fixture_and_is_not_counted(self):
+        # 3 plan entries x 3 repeats = 9 timed runs; with a warm-up each of the 3 scenario/fixture pairs
+        # gets exactly one extra run, before its first timed run, and that run is not saved
+        out, calls, main, confirm = self.run_release("warm", "normal", WARMUP_DURATION="30s")
+        self.assertEqual(calls, {"token-chat-openai": 4, "direct-token-chat-openai": 4, "routing-ewma": 4})
+        self.assertEqual(out.count("--- warm-up "), 3)
+        self.assertIn("Warm-up: 30s", out)
+        timed = sorted(p.name for p in main.glob("*__run*.log") if not p.name.endswith(".driver.log"))
+        self.assertEqual(len(timed), 9)
+        m = json.loads((main / "metrics.json").read_text())["scenarios"]
+        self.assertEqual({k: v["repeats"] for k, v in m.items()},
+                         {"token-chat-openai": 3, "direct-token-chat-openai": 3, "routing-ewma": 3})
+        self.assertTrue((main / "token-chat-openai__warmup.driver.log").exists())
+
+    def test_no_warm_up_by_default(self):
+        out, calls, main, confirm = self.run_release("nowarm", "normal")
+        self.assertEqual(calls, {"token-chat-openai": 3, "direct-token-chat-openai": 3, "routing-ewma": 3})
+        self.assertNotIn("--- warm-up ", out)
+        self.assertIn("Warm-up: off", out)
+
+    def test_the_shipped_config_warms_up_for_30s(self):
+        import yaml
+        cfg = yaml.safe_load((K6_TESTS / "benchmark_config.yaml").read_text())
+        self.assertEqual(cfg["global"]["warmup_duration"], "30s")
+
+    def test_warm_up_can_be_turned_off_with_zero(self):
+        cfg = self.T / "benchmark_config.yaml"
+        cfg.write_text(cfg.read_text().replace("warmup_duration: 0s", "warmup_duration: 30s"))
+        out, calls, main, confirm = self.run_release("off", "normal", WARMUP_DURATION="0s")
+        self.assertEqual(calls["routing-ewma"], 3)
+        self.assertIn("Warm-up: off", out)
+
+    def test_warm_up_length_comes_from_the_slo_config_and_is_validated(self):
+        cfg = self.T / "benchmark_config.yaml"
+        cfg.write_text(cfg.read_text().replace("warmup_duration: 0s", "warmup_duration: 20s"))
+        out, calls, main, confirm = self.run_release("cfgwarm", "normal")
+        self.assertIn("Warm-up: 20s", out)
+        self.assertEqual(calls["routing-ewma"], 4)
+        r, _ = self.run_raw("badwarm", WARMUP_DURATION="soon")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("WARMUP_DURATION must be", r.stderr)
 
     def baseline(self):
         out, calls, main, confirm = self.run_release("base", "normal")

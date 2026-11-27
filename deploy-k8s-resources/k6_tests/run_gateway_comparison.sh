@@ -31,7 +31,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Configuration
 # -----------------------------------------------------------------------------
 SCENARIO=${1:-token-chat-openai}
-GATEWAYS=${GATEWAYS:-kong}
+GATEWAYS=${GATEWAYS:-kong,litellm}
 FIXTURE=${FIXTURE:-short}
 LOAD=${LOAD:-25}
 DURATION=${DURATION:-6m}
@@ -140,6 +140,10 @@ ROUTE_PATTERNS["kong:stream-openai"]="/bench/token/stream/openai"
 ROUTE_PATTERNS["kong:stream-gemini"]="/bench/token/stream/gemini/models/mock-gemini-2.5-flash:streamGenerateContent"
 ROUTE_PATTERNS["kong:embeddings-openai"]="/bench/token/embeddings/openai"
 ROUTE_PATTERNS["kong:static-chat"]="/bench/static/chat"
+ROUTE_PATTERNS["kong:large-prompt"]="/bench/large/prompt"
+ROUTE_PATTERNS["kong:large-response"]="/bench/large/response"
+ROUTE_PATTERNS["litellm:large-prompt"]="/chat/completions"
+ROUTE_PATTERNS["litellm:large-response"]="/chat/completions"
 
 # LiteLLM routes (OpenAI-compatible API)
 ROUTE_PATTERNS["litellm:token-chat-openai"]="/chat/completions"
@@ -302,6 +306,7 @@ generate_comparison_report() {
 import csv
 import json
 import os
+import re
 import statistics
 import sys
 from collections import defaultdict
@@ -312,14 +317,37 @@ report_file = sys.argv[2]
 gateways = sys.argv[3:]
 
 def extract_metric(log_file, label):
-    """Extract a metric from k6 runner log."""
+    """Extract a metric from k6 runner log - support multiple formats."""
+    import re
     try:
         with open(log_file) as f:
-            for line in f:
-                if label in line:
-                    parts = line.split(':')
-                    if len(parts) >= 2:
-                        return float(parts[-1].strip().replace('%', '').replace('ms', ''))
+            content = f.read()
+
+            # Try multiple patterns to find the metric
+            patterns = [
+                rf'{label}[:\s]+([0-9.]+)',  # "http_req_duration p95(ms): 615.35" or "http_req_duration p95(ms) 615.35"
+                rf'{label.replace("(", "\\(").replace(")", "\\)")}[:\s]+([0-9.]+)',  # With escaped parens
+                rf'{label.split()[0]}[^0-9]*?{label.split()[-1].replace("(", "").replace(")", "")}[:\s]+([0-9.]+)',  # Partial match
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, content)
+                if match:
+                    value = float(match.group(1))
+                    return value
+
+            # Fallback: look for JSON summary if label matches known metrics
+            try:
+                json_match = re.search(r'"summary":\s*({.*?})\s*}', content)
+                if json_match:
+                    summary = json.loads(json_match.group(1))
+                    if 'http_req_duration' in label:
+                        if 'p95' in label:
+                            return summary.get('http_req_duration', {}).get('p95')
+                        elif 'p99' in label:
+                            return summary.get('http_req_duration', {}).get('p99')
+            except:
+                pass
     except:
         pass
     return None

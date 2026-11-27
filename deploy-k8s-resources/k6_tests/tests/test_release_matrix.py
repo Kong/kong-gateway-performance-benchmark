@@ -90,12 +90,27 @@ class RealMatrix(unittest.TestCase):
                   "embeddings-openai-http__mlflow50", "direct-stream-gemini", "token-chat-openai-churn",
                   "token-chat-openai-http-churn", "stream-openai-disconnect"):
             self.assertIn(k, keys)
+        # the request-size tiers (AG-2333) ran cleanly on the cluster (2026-11-26) and are enabled too
         self.assertEqual([e["key"] for e in self.all if not e["enabled"]], [])
+
+    def test_request_size_tiers_are_paired_and_part_of_the_default_plan(self):
+        sizes = ("req1k", "req4k", "req10k", "req16k")
+        keys = {e["key"] for e in self.all}
+        for prefix in ("", "mlflow50-"):
+            for size in sizes:
+                for gateway, direct in (("token-chat-openai", "direct-token-chat-openai"),
+                                        ("stream-openai", "direct-stream-openai")):
+                    self.assertIn(f"{gateway}__{prefix}{size}", keys)
+                    self.assertIn(f"{direct}__{prefix}{size}", keys)
+        default_keys = {e["key"] for e in self.tier2}
+        tiers = [k for k in default_keys if "__req" in k or "__mlflow50-req" in k]
+        self.assertEqual(len(tiers), 32)    # 4 sizes x 2 modes x 2 tracks x (gateway + direct)
+        self.assertIn("stream-openai__req10k", default_keys)
 
     def test_mlflow50_toggle(self):
         no_ml = rm.select(self.all, "tier2", include_mlflow50=False)
         self.assertTrue(all(e["track"] != "mlflow50" for e in no_ml))
-        self.assertEqual(len(self.tier2) - len(no_ml), 8)    # 6 original + the two HTTP-entry variants
+        self.assertEqual(len(self.tier2) - len(no_ml), 24)    # 6 original + the two HTTP-entry variants + 16 request-size entries
 
     def test_every_gateway_has_its_direct_pair_in_the_same_group(self):
         groups = rm.build_groups(self.tier2)
@@ -107,7 +122,8 @@ class RealMatrix(unittest.TestCase):
 
     def test_expected_counts(self):
         # 22 legacy + direct-stream-openai + 8 added with the HTTP-entry / churn / disconnect work
-        self.assertEqual(len(self.tier2), 31)
+        # + 32 request-size entries (AG-2333)
+        self.assertEqual(len(self.tier2), 63)
         self.assertEqual(len(self.tier1), 10)
 
 
@@ -303,9 +319,9 @@ class Cli(unittest.TestCase):
     def test_summary_estimate(self):
         rc, out = self.run_cli("summary", "--repeats", "6", "--duration", "3m")
         self.assertEqual(rc, 0)
-        self.assertIn("scenarios=31", out)
-        self.assertIn("runs=186", out)
-        self.assertIn("est_minutes=744", out)  # 186 * (3 + 1)
+        self.assertIn("scenarios=63", out)
+        self.assertIn("runs=378", out)
+        self.assertIn("est_minutes=1512", out)  # 378 * (3 + 1)
 
     def test_plan_tsv_shape(self):
         rc, out = self.run_cli("plan", "--tier", "tier1", "--repeats", "1")
